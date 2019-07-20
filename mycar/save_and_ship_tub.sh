@@ -8,7 +8,7 @@ MESSAGE=${1:-"-"}
 # Where to save the 'clearned' tub on the pi 
 # (just incase something goes wrong in during
 # the rsync)
-SAVEDIR="/home/users/crocodile-dundee/dingodata/"
+SAVEDIR="/home/users/josh/repos/mine/data/ZZZ_DEBUG"
 
 # Where to fine the tub to save
 TUB='tub'
@@ -20,11 +20,11 @@ CLEARTUB="--clear-tub"
 echo "Making nice tub :-) "
 TUBDIR=`python save_tub.py -t $TUB -s $SAVEDIR --message "$MESSAGE" $CLEARTUB`
 
-# Where to save the tub back on your local machine
-LOCAL_MACHINE="dundee@localhost"
-SAVEDIR="/home/dundee/Documents/repos/dingocar/data/"
+# 
+LOCAL_MACHINE="jp@localhost"
+SAVEDIR="/home/jp/Documents/repos/donkeycar/data/"
 
-# Sent to a remote machine for training if you want.
+# sent to a remote machine for training if you want.
 echo rync from ${TUBDIR} to:
 echo $LOCAL_MACHINE:$SAVEDIR
 rsync -avz -e "ssh -p 2050" $TUBDIR $LOCAL_MACHINE:$SAVEDIR
