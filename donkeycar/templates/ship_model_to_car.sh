@@ -1,0 +1,3 @@
+#!/bin/base
+
+rsync -av ${} 

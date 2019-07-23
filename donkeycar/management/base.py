@@ -13,6 +13,7 @@ from donkeycar.utils import *
 from donkeycar.management.tub import TubManager
 from donkeycar.management.joystick_creator import CreateJoystick
 import numpy as np
+import stat
 
 PACKAGE_PATH = os.path.dirname(os.path.dirname(os.path.realpath(__file__)))
 TEMPLATES_PATH = os.path.join(PACKAGE_PATH, 'templates')
@@ -50,6 +51,11 @@ class BaseCommand(object):
     pass
 
 
+def copy_with_executable_bit(src, dst):
+    shutil.copyfile(src, dst)
+    st = os.stat(dst)
+    os.chmod(dst, st.st_mode | stat.S_IEXEC)
+
 class CreateCar(BaseCommand):
     
     def parse_args(self, args):
@@ -64,7 +70,7 @@ class CreateCar(BaseCommand):
     def run(self, args):
         args = self.parse_args(args)
         self.create_car(path=args.path, template=args.template, overwrite=args.overwrite)
-    
+   
     def create_car(self, path, template='complete', overwrite=False):
         """
         This script sets up the folder structure for donkey to work.
@@ -95,6 +101,22 @@ class CreateCar(BaseCommand):
         car_config_path = os.path.join(path, 'config.py')
         mycar_config_path = os.path.join(path, 'myconfig.py')
         train_app_path = os.path.join(path, 'train.py')
+      
+        vars_template_path = os.path.join(TEMPLATES_PATH, 'vars.sh')
+        vars_path = os.path.join(path, 'vars.sh')
+        ssh_to_car_template_path = os.path.join(TEMPLATES_PATH, 'ssh_to_car.sh')
+        ssh_to_car_path = os.path.join(path, 'ssh_to_car.sh')
+        zip_and_ship_tub_template_path = os.path.join(TEMPLATES_PATH, 'zip_and_ship_tub.sh')
+        zip_and_ship_tub_path = os.path.join(path, 'zip_and_ship_tub.sh')
+        ship_model_to_car_template_path = os.path.join(TEMPLATES_PATH, 'ship_model_to_car.sh')
+        ship_model_to_car_path = os.path.join(path, 'ship_model_to_car.sh')
+        info_json_template_path = os.path.join(TEMPLATES_PATH, 'info.json')
+        info_json_path = os.path.join(path, 'info.json')
+
+        car_app_path = os.path.join(path, 'manage.py')
+        car_config_path = os.path.join(path, 'config.py')
+        mycar_config_path = os.path.join(path, 'myconfig.py')
+        train_app_path = os.path.join(path, 'train.py')
         
         if os.path.exists(car_app_path) and not overwrite:
             print('Car app already exists. Delete it and rerun createcar to replace.')
@@ -113,6 +135,12 @@ class CreateCar(BaseCommand):
         else:
             print("Copying train script. Adjust these before starting your car.")
             shutil.copyfile(train_template_path, train_app_path)
+
+        shutil.copyfile(vars_template_path, vars_path)
+        copy_with_executable_bit(ssh_to_car_template_path, ssh_to_car_path)
+        copy_with_executable_bit(zip_and_ship_tub_template_path, zip_and_ship_tub_path)
+        copy_with_executable_bit(ship_model_to_car_template_path, ship_model_to_car_path)
+        shutil.copyfile(info_json_template_path, info_json_path)
 
         if not os.path.exists(mycar_config_path):
             print("Copying my car config overrides")
