@@ -2,7 +2,7 @@ name: dingo
 channels:
 - anaconda
 dependencies:
-- tensorflow-gpu==1.13.1
+- tensorflow-gpu==1.14
 - tornado=4.5.3
 - h5py
 - pillow

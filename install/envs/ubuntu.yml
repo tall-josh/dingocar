@@ -2,7 +2,7 @@ name: dingo
 channels:
 - anaconda
 dependencies:
-- tensorflow==1.13.1
+- tensorflow==1.14
 - tornado=4.5.3
 - h5py
 - pillow
@@ -14,3 +14,13 @@ dependencies:
 - jupyterlab
 - tqdm
 - matplotlib
+- opencv
+- tornado
+- pylint
+- pytest
+- pip
+
+- pip:
+  - moviepy
+  - paho-mqtt
+  - PrettyTable
