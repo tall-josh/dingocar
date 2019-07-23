@@ -11,7 +11,7 @@ MESSAGE=${1:-"-"}
 TUB='tub'
 
 echo "Making nice tub :-) "
-TUBDIR=`python organize_tub.py -t ${TUB} -s ${PI_SAVEDIR} --message "${MESSAGE}" ${CLEARTUB}`
+TUBDIR=`python ../scripts/organize_tub.py -t ${TUB} -s ${CAR_SAVEDIR} --message "${MESSAGE}" ${CLEARTUB}`
 
 # sent to a remote machine for training if you want.
 echo rync from ${TUBDIR} to:
