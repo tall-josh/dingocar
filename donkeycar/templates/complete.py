@@ -29,9 +29,8 @@ from donkeycar.parts.throttle_filter import ThrottleFilter
 from donkeycar.parts.behavior import BehaviorPart
 from donkeycar.parts.file_watcher import FileWatcher
 from donkeycar.parts.launch import AiLaunch
-import config
 
-def prepare_dingo_car_style_archive(tub_path, info_json, data_path):
+def prepare_dingo_car_style_archive(tub_path, info_json, data_path, remote_dst=None, port=2050):
         from scripts.organize_tub import archive_tub, clear_tub_keep_meta
         choice = input(("What would you like to do with this data?\n"
                                "(z)ip and ship, (d)elet, (l)eave me alone! : "))
@@ -62,7 +61,7 @@ def drive(cfg, model_path=None, use_joystick=False, model_type=None, camera_type
     cfg.DRIVE_LOOP_HZ assuming each part finishes processing in a timely manner.
     Parts may have named outputs and inputs. The framework handles passing named outputs
     to parts requesting the same named input.
-    '''
+    m'''
 
     if cfg.DONKEY_GYM:
         #the simulator will use cuda and then we usually run out of resources
@@ -564,7 +563,13 @@ def drive(cfg, model_path=None, use_joystick=False, model_type=None, camera_type
             max_loop_count=cfg.MAX_LOOPS)
 
     if tub.current_ix >= 0:
-        prepare_dingo_car_style_archive(cfg)
+        tub_path, info_json, data_path, remote_dst=None, port=2050)
+        prepare_dingo_car_style_archive(os.path.join(cfg.CAR_PATH, "tub"),
+                                        cfg.INFO_PATH,
+                                        cfg.DATA_PATH,
+                                        cfg.REMOTE_DST,
+                                        cfg.REMOTE_PORT)
+
 
 
 def all_dingo_tub_archives(tub_paths):

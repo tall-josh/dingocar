@@ -86,6 +86,9 @@ def archive_tub(tub_path, info_path, save_dir, message=None, clear_tub=False):
 
     return outdir
 
+def rsync(src, dst, port=2050):
+    os.system(f'rsync -avz -e "ssh -p {port}" {src} {dst}')
+
 def zipdir(path, ziph):
     # ziph is zipfile handle
     for root, dirs, files in os.walk(path):
