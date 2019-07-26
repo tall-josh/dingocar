@@ -9,7 +9,8 @@ import os
 import types
     
 class Config:
-    
+   
+
     def from_pyfile(self, filename, silent=False):
         #filename = os.path.join(self.root_path, filename)
         d = types.ModuleType('config')
@@ -41,6 +42,17 @@ class Config:
             if attr.isupper():
                 print(attr, ":", getattr(self, attr))
 
+    def write_to_file(self, path):
+        with open(path, 'w') as f:
+            f.write("import os\n\n")
+            for key in dir(self):
+                if key.isupper():
+                    value = getattr(self, key)
+                    if type(value) == str:
+                        line = f"{key} = '{getattr(self, key)}'\n"
+                    else:
+                        line = f"{key} = {getattr(self, key)}\n"
+                    f.write(line)
 
 
 def load_config(config_path=None):

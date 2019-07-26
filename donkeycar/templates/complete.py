@@ -29,6 +29,7 @@ from donkeycar.parts.throttle_filter import ThrottleFilter
 from donkeycar.parts.behavior import BehaviorPart
 from donkeycar.parts.file_watcher import FileWatcher
 from donkeycar.parts.launch import AiLaunch
+import config
 
 def drive(cfg, model_path=None, use_joystick=False, model_type=None, camera_type='single', meta=[] ):
     '''
@@ -537,34 +538,71 @@ def drive(cfg, model_path=None, use_joystick=False, model_type=None, camera_type
         ctr.print_controls()
 
     #run the vehicle for 20 seconds
-    V.start(rate_hz=cfg.DRIVE_LOOP_HZ, 
+    V.start(rate_hz=cfg.DRIVE_LOOP_HZ,
             max_loop_count=cfg.MAX_LOOPS)
 
+    if tub.current_ix >= 0:
+        choice = input(("What would you like to do with this data?\n"
+                               "(z)ip and ship, (d)elet, (l)eave me alone! : "))
+        while choice.lower() not in ['d', 'z', 'l']:
+            choice = intput("Please enter 'y' or 'n': ")
+
+        if choice.lower() == 'z':
+            from scripts.organize_tub import archive_tub, clear_tub
+
+            tub_path = os.path.join(cfg.CAR_PATH, "tub")
+            message  = input("Leave a comment: ")
+            outdir   = archive_tub(tub_path,
+                                   cfg.INFO_JSON,
+                                   cfg.DATA_PATH,
+                                   message=message,
+                                   clear_tub=True)
+            print(f"Nice tub archive has been saved at: '{outdir}'")
+
+        elif choice.lower() == 'd':
+            clear_tub(tub_path)
+            print("Tub '{tub_path}' has been cleared")
+
+def all_dingo_tub_archives(tub_paths):
+    # The 'info.json' is a tell tail sign that you're looking at a dingo tub archive
+    number_of_dingo_archives = sum([os.path.exists(os.path.join(t, "info.json")) for t in tub_paths])
+    are_all_dingo_archives = False
+    if number_of_dingo_archives > 0:
+        assert number_of_dingo_archives == len(tub_paths),\
+                               ("All paths must lead to dingo tub archives or "
+                                "traditional donkey tubs. YOU CAN'T MIX AND MATCH")
+        are_all_dingo_archives = True
+    return are_all_dingo_archives
 
 if __name__ == '__main__':
     args = docopt(__doc__)
+    print(f"args: {args}")
     cfg = dk.load_config()
-    
+
     if args['drive']:
         model_type = args['--type']
         camera_type = args['--camera']
         drive(cfg, model_path=args['--model'], use_joystick=args['--js'], model_type=model_type, camera_type=camera_type,
             meta=args['--meta'])
-    
+
     if args['train']:
         from train import multi_train, preprocessFileList
-        
+
         tub = args['--tub']
         model = args['--model']
         transfer = args['--transfer']
         model_type = args['--type']
         continuous = args['--continuous']
-        aug = args['--aug']     
+        aug = args['--aug']
 
         dirs = preprocessFileList( args['--file'] )
         if tub is not None:
             tub_paths = [os.path.expanduser(n) for n in tub.split(',')]
             dirs.extend( tub_paths )
+
+        if all_dingo_tub_archives(dirs):
+            from scripts.make_model_name import process_dingo_archives_gen_model_path
+            model, dirs = process_dingo_archives_gen_model_path(dirs, cfg.MODELS_PATH, cfg)
 
         multi_train(cfg, dirs, model, transfer, model_type, continuous, aug)
 

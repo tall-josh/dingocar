@@ -48,7 +48,7 @@ MESSAGE  = "message"
 LOCATION = "location"
 DATE     = "date"
 
-def cleanup_tub(tub_path, info_path, save_dir, message=None, clear_tub=False):
+def archive_tub(tub_path, info_path, save_dir, message=None, clear_tub=False):
     with open(info_path, 'r') as f:
         info = json.load(f)
     images  = glob(os.path.join(tub_path, "*.jpg"))
@@ -60,10 +60,9 @@ def cleanup_tub(tub_path, info_path, save_dir, message=None, clear_tub=False):
         info[MESSAGE] = message
     now = dt.now().strftime("%Y-%m-%d_%H:%M:%S")
     info[DATE] = now
-    loc    = info[LOCATION].replace(" ", "_")
-    outdir = f"{loc}_{now}"
+    outdir = f"{info[LOCATION]}_{now}"
+    outdir = outdir.lower().replace(' ', "_")
     outdir = os.path.join(save_dir, outdir)
-    #outdir = outdir.lower().replace(' ', "_") 
     os.makedirs(outdir)
 
     outzip = os.path.join(outdir, "tub.zip")
@@ -77,11 +76,15 @@ def cleanup_tub(tub_path, info_path, save_dir, message=None, clear_tub=False):
         json.dump(info, f, indent=2)
 
     if clear_tub:
-        for f in images + records:
-            os.remove(f)
+        clear_tub(tub_path)
 
     return outdir
 
+def clear_tub(path):
+    images  = glob(os.path.join(tub_path, "*.jpg"))
+    records = glob(os.path.join(tub_path, "record_*.json"))
+    for f in images + records:
+        os.remove(f)
 
 def zipdir(path, ziph):
     # ziph is zipfile handle
@@ -105,7 +108,7 @@ def main():
     args.add_argument("--message", type=str, required=False, default=None)
     params = args.parse_args()
 
-    outdir = cleanup_tub(params.tub, params.info,
+    outdir = archive_tub(params.tub, params.info,
                 params.save_dir, message=params.message,
                 clear_tub=params.clear_tub)
     print(outdir)

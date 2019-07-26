@@ -56,6 +56,40 @@ def copy_with_executable_bit(src, dst):
     st = os.stat(dst)
     os.chmod(dst, st.st_mode | stat.S_IEXEC)
 
+def get_os():
+    import platform
+    plat = platform.system().lower()
+    if plat == "darwin":
+        return "mac"
+    else:
+        return plat
+
+def do_dingo_steps(path, TEMPLATES_PATH):
+        DINGO_TEMPLATES = os.path.join(TEMPLATES_PATH, "dingocar")
+        info_json_template_path = os.path.join(DINGO_TEMPLATES, 'info.json')
+        info_json_path = os.path.join(path, 'info.json')
+        shutil.copyfile(info_json_template_path, info_json_path)
+
+        # TODO: Is this needed anymore: josh 26-07-2019
+        '''
+        os_type = get_os()
+        TEMPLATES_PATH = os.path.join(TEMPLATES_PATH, "dingo_scripts", os_type)
+        shutil.copytree(TEMPLATES_PATH, os.path.join(path, "dingo_scripts"))
+        vars_template_path = os.path.join(TEMPLATES_PATH, 'vars.sh')
+        vars_path = os.path.join(path, 'vars.sh')
+        ssh_to_car_template_path = os.path.join(TEMPLATES_PATH, 'ssh_to_car.sh')
+        ssh_to_car_path = os.path.join(path, 'ssh_to_car.sh')
+        zip_and_ship_tub_template_path = os.path.join(TEMPLATES_PATH, 'zip_and_ship_tub.sh')
+        zip_and_ship_tub_path = os.path.join(path, 'zip_and_ship_tub.sh')
+        ship_model_to_car_template_path = os.path.join(TEMPLATES_PATH, 'ship_model_to_car.sh')
+        ship_model_to_car_path = os.path.join(path, 'ship_model_to_car.sh')
+
+        shutil.copyfile(vars_template_path, vars_path)
+        copy_with_executable_bit(ssh_to_car_template_path, ssh_to_car_path)
+        copy_with_executable_bit(zip_and_ship_tub_template_path, zip_and_ship_tub_path)
+        copy_with_executable_bit(ship_model_to_car_template_path, ship_model_to_car_path)
+        '''
+
 class CreateCar(BaseCommand):
     
     def parse_args(self, args):
@@ -101,17 +135,6 @@ class CreateCar(BaseCommand):
         car_config_path = os.path.join(path, 'config.py')
         mycar_config_path = os.path.join(path, 'myconfig.py')
         train_app_path = os.path.join(path, 'train.py')
-      
-        vars_template_path = os.path.join(TEMPLATES_PATH, 'vars.sh')
-        vars_path = os.path.join(path, 'vars.sh')
-        ssh_to_car_template_path = os.path.join(TEMPLATES_PATH, 'ssh_to_car.sh')
-        ssh_to_car_path = os.path.join(path, 'ssh_to_car.sh')
-        zip_and_ship_tub_template_path = os.path.join(TEMPLATES_PATH, 'zip_and_ship_tub.sh')
-        zip_and_ship_tub_path = os.path.join(path, 'zip_and_ship_tub.sh')
-        ship_model_to_car_template_path = os.path.join(TEMPLATES_PATH, 'ship_model_to_car.sh')
-        ship_model_to_car_path = os.path.join(path, 'ship_model_to_car.sh')
-        info_json_template_path = os.path.join(TEMPLATES_PATH, 'info.json')
-        info_json_path = os.path.join(path, 'info.json')
 
         car_app_path = os.path.join(path, 'manage.py')
         car_config_path = os.path.join(path, 'config.py')
@@ -136,11 +159,7 @@ class CreateCar(BaseCommand):
             print("Copying train script. Adjust these before starting your car.")
             shutil.copyfile(train_template_path, train_app_path)
 
-        shutil.copyfile(vars_template_path, vars_path)
-        copy_with_executable_bit(ssh_to_car_template_path, ssh_to_car_path)
-        copy_with_executable_bit(zip_and_ship_tub_template_path, zip_and_ship_tub_path)
-        copy_with_executable_bit(ship_model_to_car_template_path, ship_model_to_car_path)
-        shutil.copyfile(info_json_template_path, info_json_path)
+        do_dingo_steps(path, TEMPLATES_PATH)
 
         if not os.path.exists(mycar_config_path):
             print("Copying my car config overrides")
