@@ -48,6 +48,12 @@ MESSAGE  = "message"
 LOCATION = "location"
 DATE     = "date"
 
+def clear_tub_keep_meta(tub_path):
+    images  = glob(os.path.join(tub_path, "*.jpg"))
+    records = glob(os.path.join(tub_path, "record_*.json"))
+    for f in images + records:
+        os.remove(f)
+
 def archive_tub(tub_path, info_path, save_dir, message=None, clear_tub=False):
     with open(info_path, 'r') as f:
         info = json.load(f)
@@ -76,15 +82,9 @@ def archive_tub(tub_path, info_path, save_dir, message=None, clear_tub=False):
         json.dump(info, f, indent=2)
 
     if clear_tub:
-        clear_tub(tub_path)
+        clear_tub_keep_meta(tub_path)
 
     return outdir
-
-def clear_tub(path):
-    images  = glob(os.path.join(tub_path, "*.jpg"))
-    records = glob(os.path.join(tub_path, "record_*.json"))
-    for f in images + records:
-        os.remove(f)
 
 def zipdir(path, ziph):
     # ziph is zipfile handle

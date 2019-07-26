@@ -31,6 +31,28 @@ from donkeycar.parts.file_watcher import FileWatcher
 from donkeycar.parts.launch import AiLaunch
 import config
 
+def prepare_dingo_car_style_archive(tub_path, info_json, data_path):
+        from scripts.organize_tub import archive_tub, clear_tub_keep_meta
+        choice = input(("What would you like to do with this data?\n"
+                               "(z)ip and ship, (d)elet, (l)eave me alone! : "))
+        while choice.lower() not in ['d', 'z', 'l']:
+            choice = intput("Please enter 'y' or 'n': ")
+
+        if choice.lower() == 'z':
+
+            #tub_path = os.path.join(cfg.CAR_PATH, "tub")
+            message  = input("Leave a comment: ")
+            outdir   = archive_tub(tub_path,
+                                   info_json,
+                                   data_path,
+                                   message=message,
+                                   clear_tub=True)
+            print(f"Nice tub archive has been saved at: '{outdir}'")
+
+        elif choice.lower() == 'd':
+            clear_tub_keep_meta(tub_path)
+            print(f"Tub '{tub_path}' has been cleared")
+
 def drive(cfg, model_path=None, use_joystick=False, model_type=None, camera_type='single', meta=[] ):
     '''
     Construct a working robotic vehicle from many parts.
@@ -542,26 +564,8 @@ def drive(cfg, model_path=None, use_joystick=False, model_type=None, camera_type
             max_loop_count=cfg.MAX_LOOPS)
 
     if tub.current_ix >= 0:
-        choice = input(("What would you like to do with this data?\n"
-                               "(z)ip and ship, (d)elet, (l)eave me alone! : "))
-        while choice.lower() not in ['d', 'z', 'l']:
-            choice = intput("Please enter 'y' or 'n': ")
+        prepare_dingo_car_style_archive(cfg)
 
-        if choice.lower() == 'z':
-            from scripts.organize_tub import archive_tub, clear_tub
-
-            tub_path = os.path.join(cfg.CAR_PATH, "tub")
-            message  = input("Leave a comment: ")
-            outdir   = archive_tub(tub_path,
-                                   cfg.INFO_JSON,
-                                   cfg.DATA_PATH,
-                                   message=message,
-                                   clear_tub=True)
-            print(f"Nice tub archive has been saved at: '{outdir}'")
-
-        elif choice.lower() == 'd':
-            clear_tub(tub_path)
-            print("Tub '{tub_path}' has been cleared")
 
 def all_dingo_tub_archives(tub_paths):
     # The 'info.json' is a tell tail sign that you're looking at a dingo tub archive
