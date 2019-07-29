@@ -21,6 +21,21 @@ DATA_PATH = os.path.join(CAR_PATH, 'data')
 MODELS_PATH = os.path.join(CAR_PATH, 'models')
 INFO_PATH   = os.path.join(CAR_PATH, "info.json")
 
+#RSYNC
+# NOTE: Becase RSYNC_DATA_DST will be called from the car you cannot rely on 
+# CAR_PATH because it will resolve to the mycar dir on the pi/nano NOT your 
+# laptop. The inverse is true for RSYNC_MODEL_DST. So you'll need to type the
+# full path manually.
+RSYNC_DATA_DST  = "TO BE FILLED BEFORE YOU START. SHOULD LOOK SOMETHING LIKE:"
+                   # username@localhost:/home/username/where/to/store/data/"
+RSYNC_MODEL_DST = "TO BE FILLED BEFORE YOU START. SHOULD LOOK SOMETHING LIKE:"
+                   # piusername@localhost:/home/piusername/where/to/store/models/
+
+# Port used for port forwarding when you ssh to the pi/nano. This is so you can A
+# rsync your data back from the car to your main computer. If you change this value
+# you will need to chage the PORT variable in the 'ssh_to_car.sh' script too.
+REMOTE_PORT = 2050
+
 #VEHICLE
 DRIVE_LOOP_HZ = 20      # the vehicle loop will pause if faster than this speed.
 MAX_LOOPS = None        # the vehicle loop can abort after this many iterations, when given a positive integer.

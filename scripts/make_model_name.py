@@ -11,8 +11,6 @@ dingo_archive_paths=t1,t2...tn
 model_path = model/dir/tn(plus):date.h5
 python manage train.py --tub=t1,t2...tn --model=model_path
 """
-
-
 def extract_if_not_extracted(dingo_archive):
     extracted_path = os.path.join(dingo_archive,'tub')
     os.path.expanduser(extracted_path)

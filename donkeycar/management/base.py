@@ -69,16 +69,17 @@ def do_dingo_steps(path, TEMPLATES_PATH):
         info_json_template_path = os.path.join(DINGO_TEMPLATES, 'info.json')
         info_json_path = os.path.join(path, 'info.json')
         shutil.copyfile(info_json_template_path, info_json_path)
+        os_type = get_os()
+        OS_SPECIFIC_SCRIPTS = os.path.join(DINGO_TEMPLATES, os_type)
+        ssh_to_car_template_path = os.path.join(OS_SPECIFIC_SCRIPTS, 'ssh_to_car.sh')
+        ssh_to_car_path = os.path.join(path, 'ssh_to_car.sh')
+        copy_with_executable_bit(ssh_to_car_template_path, ssh_to_car_path)
 
         # TODO: Is this needed anymore: josh 26-07-2019
         '''
-        os_type = get_os()
-        TEMPLATES_PATH = os.path.join(TEMPLATES_PATH, "dingo_scripts", os_type)
         shutil.copytree(TEMPLATES_PATH, os.path.join(path, "dingo_scripts"))
         vars_template_path = os.path.join(TEMPLATES_PATH, 'vars.sh')
         vars_path = os.path.join(path, 'vars.sh')
-        ssh_to_car_template_path = os.path.join(TEMPLATES_PATH, 'ssh_to_car.sh')
-        ssh_to_car_path = os.path.join(path, 'ssh_to_car.sh')
         zip_and_ship_tub_template_path = os.path.join(TEMPLATES_PATH, 'zip_and_ship_tub.sh')
         zip_and_ship_tub_path = os.path.join(path, 'zip_and_ship_tub.sh')
         ship_model_to_car_template_path = os.path.join(TEMPLATES_PATH, 'ship_model_to_car.sh')

@@ -31,7 +31,7 @@ from donkeycar.parts.file_watcher import FileWatcher
 from donkeycar.parts.launch import AiLaunch
 
 def prepare_dingo_car_style_archive(tub_path, info_json, data_path, remote_dst=None, port=2050):
-        from scripts.organize_tub import archive_tub, clear_tub_keep_meta
+        from scripts.organize_tub import archive_tub, clear_tub_keep_meta, rsync
         choice = input(("What would you like to do with this data?\n"
                                "(z)ip and ship, (d)elet, (l)eave me alone! : "))
         while choice.lower() not in ['d', 'z', 'l']:
@@ -46,6 +46,7 @@ def prepare_dingo_car_style_archive(tub_path, info_json, data_path, remote_dst=N
                                    data_path,
                                    message=message,
                                    clear_tub=True)
+            rsync(outdir, remote_dst, port=port)
             print(f"Nice tub archive has been saved at: '{outdir}'")
 
         elif choice.lower() == 'd':
@@ -546,15 +547,15 @@ def drive(cfg, model_path=None, use_joystick=False, model_type=None, camera_type
         print("You can now move your joystick to drive your car.")
         #tell the controller about the tub        
         ctr.set_tub(tub)
-        
+
         if cfg.BUTTON_PRESS_NEW_TUB:
-    
+
             def new_tub_dir():
                 V.parts.pop()
                 tub = th.new_tub_writer(inputs=inputs, types=types, user_meta=meta)
                 V.add(tub, inputs=inputs, outputs=["tub/num_records"], run_condition='recording')
                 ctr.set_tub(tub)
-    
+
             ctr.set_button_down_trigger('cross', new_tub_dir)
         ctr.print_controls()
 
@@ -563,14 +564,11 @@ def drive(cfg, model_path=None, use_joystick=False, model_type=None, camera_type
             max_loop_count=cfg.MAX_LOOPS)
 
     if tub.current_ix >= 0:
-        tub_path, info_json, data_path, remote_dst=None, port=2050)
         prepare_dingo_car_style_archive(os.path.join(cfg.CAR_PATH, "tub"),
                                         cfg.INFO_PATH,
                                         cfg.DATA_PATH,
-                                        cfg.REMOTE_DST,
+                                        cfg.RSYNC_DATA_DST,
                                         cfg.REMOTE_PORT)
-
-
 
 def all_dingo_tub_archives(tub_paths):
     # The 'info.json' is a tell tail sign that you're looking at a dingo tub archive
