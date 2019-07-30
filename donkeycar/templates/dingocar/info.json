@@ -1,9 +1,10 @@
 {
-  "count": -1,
-  "date": "SET AUTOMTICALLY",
-  "tape": "thick yellow",
-  "floor" : "timber",
-  "location": "office test thing del me",
-  "centre line" : true,
-  "lane width" : "40cm"
+  "count"       : -1,
+  "date"        : "SET AUTOMTICALLY",
+  "tape"        : "TO DO",
+  "floor"       : "TO DO",
+  "location"    : "TO DO",
+  "driver"      : "TO DO",
+  "centre line" : "TO DO",
+  "lane width"  : "TO DO"
 }

@@ -47,6 +47,7 @@ COUNT    = "count"
 MESSAGE  = "message"
 LOCATION = "location"
 DATE     = "date"
+DRIVER   = "driver"
 
 def clear_tub_keep_meta(tub_path):
     images  = glob(os.path.join(tub_path, "*.jpg"))
@@ -61,12 +62,13 @@ def archive_tub(tub_path, info_path, save_dir, message=None, clear_tub=False):
     records = glob(os.path.join(tub_path, "record_*.json"))
     assert len(images) == len(records)
 
+    driver = info[DRIVER]
     info[COUNT] = len(images)
     if message:
         info[MESSAGE] = message
     now = dt.now().strftime("%Y-%m-%d_%H:%M:%S")
     info[DATE] = now
-    outdir = f"{info[LOCATION]}_{now}"
+    outdir = f"{info[LOCATION]}_{driver}_{now}"
     outdir = outdir.lower().replace(' ', "_")
     outdir = os.path.join(save_dir, outdir)
     os.makedirs(outdir)
