@@ -466,6 +466,7 @@ class TubReader(Tub):
 class TubHandler():
     def __init__(self, path):
         self.path = os.path.expanduser(path)
+        self.tub_path = self.create_tub_path()
 
     def get_tub_list(self,path):
         folders = next(os.walk(path))[1]
@@ -493,8 +494,7 @@ class TubHandler():
         return tub_path
 
     def new_tub_writer(self, inputs, types, user_meta=[]):
-        tub_path = self.create_tub_path()
-        tw = TubWriter(path=tub_path, inputs=inputs, types=types, user_meta=user_meta)
+        tw = TubWriter(path=self.tub_path, inputs=inputs, types=types, user_meta=user_meta)
         return tw
 
 

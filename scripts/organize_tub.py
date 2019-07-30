@@ -21,7 +21,7 @@ This script does the following:
 
 - Wites values for; 'count', 'date' and the optional param, 'message'
 - Makes 'outdir' at 'params.save-dir/info["location"]_{yyyy-mm-dd_HH:MM:SS}'
-- Copies params.tub/0_cam-image_array_.jpg to 'outdir'
+- Copies params.tub/1_cam-image_array_.jpg to 'outdir'
 - Creates a zip file of params.tub 'tub.zip' and moves to 'outdir'
 - writes info.json to 'outdir'
 
@@ -30,7 +30,7 @@ output file structure:
       Simulated_Warehouse_2019-08-22_14:30:59/
         - info.json
         - tub.zip
-        - 0_cam-image_array_.jpg
+        - 1_cam-image_array_.jpg
 
 The optional param 'clear-tub' will also delete the contents of paras.tub, excluding
 the file meta.json.
@@ -41,7 +41,7 @@ import os
 from datetime import datetime as dt
 from glob import glob
 import zipfile
-from shutil import copyfile
+from shutil import copyfile, rmtree
 
 COUNT    = "count"
 MESSAGE  = "message"
@@ -55,7 +55,11 @@ def clear_tub_keep_meta(tub_path):
     for f in images + records:
         os.remove(f)
 
-def archive_tub(tub_path, info_path, save_dir, message=None, clear_tub=False):
+def delete_tub(tub_path):
+    rmtree(tub_path)
+
+def archive_tub(tub_path, info_path, save_dir,
+                message=None, delete_tub_when_done=False):
     with open(info_path, 'r') as f:
         info = json.load(f)
     images  = glob(os.path.join(tub_path, "*.jpg"))
@@ -76,15 +80,15 @@ def archive_tub(tub_path, info_path, save_dir, message=None, clear_tub=False):
     outzip = os.path.join(outdir, "tub.zip")
     ziptub(tub_path, outzip)
 
-    src = os.path.join(tub_path, "0_cam-image_array_.jpg")
-    dst = os.path.join(outdir, "0_cam-image_array_.jpg")
+    src = os.path.join(tub_path, "1_cam-image_array_.jpg")
+    dst = os.path.join(outdir, "1_cam-image_array_.jpg")
     copyfile(src, dst)
     info_save_path = os.path.join(outdir, "info.json")
     with open(info_save_path, 'w') as f:
         json.dump(info, f, indent=2)
 
-    if clear_tub:
-        clear_tub_keep_meta(tub_path)
+    if delete_tub_when_done:
+        delete_tub(tub_path)
 
     return outdir
 

@@ -31,7 +31,7 @@ from donkeycar.parts.file_watcher import FileWatcher
 from donkeycar.parts.launch import AiLaunch
 
 def prepare_dingo_car_style_archive(tub_path, info_json, data_path, remote_dst=None, port=2050):
-        from scripts.organize_tub import archive_tub, clear_tub_keep_meta, rsync
+        from scripts.organize_tub import archive_tub, delete_tub, rsync
         choice = input(("What would you like to do with this data?\n"
                                "(z)ip and ship, (d)elet, (l)eave me alone! : "))
         while choice.lower() not in ['d', 'z', 'l']:
@@ -45,13 +45,13 @@ def prepare_dingo_car_style_archive(tub_path, info_json, data_path, remote_dst=N
                                    info_json,
                                    data_path,
                                    message=message,
-                                   clear_tub=True)
+                                   delete_tub_when_done=True)
             rsync(outdir, remote_dst, port=port)
             print(f"Nice tub archive has been saved at: '{outdir}'")
 
         elif choice.lower() == 'd':
-            clear_tub_keep_meta(tub_path)
-            print(f"Tub '{tub_path}' has been cleared")
+            delete_tub(tub_path)
+            print(f"Tub '{tub_path}' has been deleted")
 
 def drive(cfg, model_path=None, use_joystick=False, model_type=None, camera_type='single', meta=[] ):
     '''
@@ -564,7 +564,8 @@ def drive(cfg, model_path=None, use_joystick=False, model_type=None, camera_type
             max_loop_count=cfg.MAX_LOOPS)
 
     if tub.current_ix >= 0:
-        prepare_dingo_car_style_archive(os.path.join(cfg.CAR_PATH, "tub"),
+        tub_path = th.tub_path
+        prepare_dingo_car_style_archive(tub_path,
                                         cfg.INFO_PATH,
                                         cfg.DATA_PATH,
                                         cfg.RSYNC_DATA_DST,
@@ -583,7 +584,6 @@ def all_dingo_tub_archives(tub_paths):
 
 if __name__ == '__main__':
     args = docopt(__doc__)
-    print(f"args: {args}")
     cfg = dk.load_config()
 
     if args['drive']:
