@@ -35,7 +35,7 @@ from donkeycar.parts.datastore import Tub
 from donkeycar.parts.keras import KerasLinear, KerasIMU,\
      KerasCategorical, KerasBehavioral, Keras3D_CNN,\
      KerasRNN_LSTM, KerasLatent
-from donkeycar.parts.augment import augment_image
+from donkeycar.parts.augment import dingo_aug, load_shadow_image_without_alpha_channel
 from donkeycar.utils import *
 
 
@@ -291,6 +291,17 @@ def train(cfg, tub_names, model_name, transfer_model, model_type, continuous, au
     saves the output trained model as model_name
     ''' 
     verbose = cfg.VEBOSE_TRAIN
+    if aug and cfg.AUG_SHADOW_IMAGES_PATTERN is not None:
+        shadow_images = load_shadow_image_without_alpha_channel(cfg.AUG_SHADOW_IMAGES_PATTERN)
+        print((f"Using {len(shadow_images)} shadow images "
+                "found at '{cfg.AUG_SHADOW_IMAGES_PATTERN}'"))
+        assert len(shadow_images) > 0, ("By using the --aug flag AND "
+               "cfg.AUG_SHADOW_IMAGES_PATTERN having a pattern, you have "
+               "indicated you want to use the shadow image augmentation step. "
+               "Cannot find any images at the pattern provided: \n"
+               "'{cfg.AUG_SHADOW_IMAGES_PATTERN}' \n"
+               "set cfg.AUG_SHADOW_IMAGES_PATTERN to None or check the "
+               "pattern")
 
     if model_name and not '.h5' == model_name[-3:]:
         raise Exception("Model filename should end with .h5")
@@ -338,7 +349,6 @@ def train(cfg, tub_names, model_name, transfer_model, model_type, continuous, au
     def generator(save_best, opts, data, batch_size, isTrainSet=True, min_records_to_train=1000):
         
         num_records = len(data)
-
         while True:
 
             if isTrainSet and opts['continuous']:
@@ -422,7 +432,12 @@ def train(cfg, tub_names, model_name, transfer_model, model_type, continuous, au
                                 break
                             
                             if aug:
-                                img_arr = augment_image(img_arr)
+                                img_arr, angle = dingo_aug(cfg,
+                                                           img_arr,
+                                                           record['angle'],
+                                                           shadow_images = shadow_images)
+                                                           #do_warp_persp = cfg.AUG_WARP_PERSPECTIVE)
+                                record['angle'] = angle
 
                             if cfg.CACHE_IMAGES:
                                 record['img_data'] = img_arr

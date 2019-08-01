@@ -9,6 +9,8 @@ from PIL import ImageEnhance
 import glob
 import numpy as np
 import math
+from donkeycar.parts.dingo_aug import *
+import glob
 
 '''
     find_coeffs and persp_transform borrowed from:
@@ -83,5 +85,81 @@ def load_shadow_images(path_mask):
         mask = Image.merge("L", (a,))
         shadow_images.append((top, mask))
     return shadow_images
+
+def load_shadow_image_without_alpha_channel(path_mask):
+    shadow_images = []
+    filenames = glob.glob(path_mask)
+    # Just load filenames. Load the images on the fly during trainging time.
+    '''
+    for filename in filenames:
+        shadow = Image.open(filename)
+        shadow.thumbnail((256, 256))
+        shadow_images.append(np.asarray(shadow))
+    '''
+    return filenames
+
+def dingo_aug(cfg, np_img, steering_angle, shadow_images=None):
+
+    aug = cfg.AUG_MIRROR_STEERING
+    if aug is not None and random_bool(aug[0]):
+        # Need to figure out how to effect steering angle
+        np_img          = mirror_image(np_img)
+        steering_angle *= -1.
+
+    aug = cfg.AUG_SALT_AND_PEPPER
+    if aug is not None and random_bool(aug[0]):
+        per_pixel_prob = aug[1]
+        np_img         = salt_and_pepper(np_img, prob = per_pixel_prob)
+
+    aug = cfg.AUG_100S_AND_1000S
+    if aug is not None and random_bool(aug[0]):
+        per_pixel_prob = aug[1]
+        np_img         = hundreds_and_thousands(np_img, prob = per_pixel_prob)
+
+    aug = cfg.AUG_SHADOW_IMAGES
+    if aug is not None and random_bool(aug[0]):
+        max_alpha = float(aug[1])
+        np_img    = overlay_random_image(np_img, max_alpha, shadow_images)
+
+    aug = cfg.AUG_PIXEL_SATURATION
+    if aug is not None and random_bool(aug[0]):
+        sat_min = aug[1]
+        sat_max = aug[2]
+        np_img  = saturation(np_img, sat_min, sat_max)
+
+    aug = cfg.AUG_SHUFFLE_CHANNELS
+    if aug is not None and random_bool(aug[0]):
+        np_img = shuffle_channels(np_img)
+
+    aug = cfg.AUG_BLOCKOUT
+    if aug is not None and random_bool(aug[0]):
+        frac_min = aug[1]
+        frac_max = aug[2]
+        np_img   = blockout(np_img, frac_min, frac_max)
+
+    if cfg.AUG_NORMALIZE:
+        np_img = np.divide(np_img, 255.)
+
+    return np_img, steering_angle
+
+def random_bool(true_prob):
+    return np.random.choice([True, False], 1, p=[true_prob, 1.-true_prob])
+    
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 
 
