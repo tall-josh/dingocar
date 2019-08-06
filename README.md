@@ -1,3 +1,104 @@
+# Dingocar...Donkeycar, down-under
+
+# Install on Comuter/Laptop (Not the Pi)
+
+Donkeycar has great documentation but we have a few convienace functions that need 
+slightly different setup. Soooo I have litterally copied the docs from donkeycar and 
+added the bits we need.
+
+1. **ONLY If you dont have Conda**
+```
+wget https://repo.anaconda.com/miniconda/Miniconda3-latest-Linux-x86_64.sh
+bash ./Miniconda3-latest-Linux-x86_64.sh
+```
+
+2. cd to where you want to clone the dingocar repo, and clone.
+```
+cd my_repos
+git clone https://github.com/tall-josh/dingocar.git
+cd dingocar
+git checkout master
+```
+
+3. Create a dingocar environment
+
+**For tensorflow-cpu**
+```
+conda env create -f install/envs/ubuntu-cpu.yml 
+```
+
+**For tensorflow-gpu**
+```
+conda env create -f install/envs/ubuntu-gup.yml 
+```
+
+4. Install
+```
+conda activate dingo
+pip install -e .[pc]
+```
+
+5. Create your working dir
+```
+donkey createcar --path mycar
+```
+
+---
+
+
+
+# How to Train Responsibly
+
+These are the steps to follow from gather data (manually drive) to training to driving with an Neural Network.
+
+## On your local machine
+
+### Onetime setup
+
+1. Make sure your running an ssh server on your local machine. If not intall it.
+
+```
+sudo apt-get update
+sudo apt-get install openssh-server
+```
+
+2. Add your own public key to authorized keys
+
+```
+cat ~/.ssh/id_rsa.pub >> authorized_keys
+```
+
+### Shh to pi, with the right args.
+
+1. ssh to the pi with `-AR`. `A` will forward with you're local credentials. The
+`R 2050` will forward a port from the Pi back to your local machine. This will allow
+our scrips on the Pi `scp` (secure copy) files back to your loacl machine once you
+are done driving.
+
+```
+ssh -AR 2050:localhost:22 pi@roba1.local
+
+# Now you're on the Pi
+```
+
+### Gather driving data
+
+**On the Pi**
+
+0. `cd play/roba1/mycar`
+
+1. Fill in the `info.json`: The `info.json` is used to help keep track of when a dataset was gathers and what type of data is in the tub that is gathered. I recomend you fill this is at the start of a labelling session (or whenever your track or track  environment changes). A sample `info.json` is below:
+
+```
+{
+  "count"       : SET AUTOMATICALLY,
+  "date"        : SET AUTOMATICALLY,
+  "tape"        : "thick yellow",
+  "floor"       : "timber",
+  "location"    : "bill gates' house",
+  "centre line" : true,
+
+
 # donkeycar: a python self driving library
 
 [![Build Status](https://travis-ci.org/autorope/donkeycar.svg?branch=dev)](https://travis-ci.org/autorope/donkeycar)

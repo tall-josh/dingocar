@@ -24,6 +24,7 @@ import time
 import zlib
 from os.path import basename, join, splitext, dirname
 import pickle
+import datetime
 
 from tensorflow.python import keras
 from docopt import docopt
@@ -213,11 +214,13 @@ class MyCPCallback(keras.callbacks.ModelCheckpoint):
 def on_best_model(cfg, model, model_filename):
 
     model.save(model_filename)
-    #TODO figure out why keras in tensorflow has a problem with saving to json/weights
-    return
-
-    #Save json and weights file too
-    json_fnm, weights_fnm = save_json_and_weights(model, model_filename)
+    return #TODO can we save a tfilte on the fly?
+    
+    #Save tflite file too
+    tflite_fnm = model_filename.replace(".h5", ".tflite")
+    assert(".tflite" in tflite_fnm)
+    from donkeycar.parts.tflite import keras_session_to_tflite
+    keras_session_to_tflite(model, tflite_fnm)
 
     if not cfg.SEND_BEST_MODEL_TO_PI:
         return
@@ -229,8 +232,7 @@ def on_best_model(cfg, model, model_filename):
     if not on_windows:
         print('sending model to the pi')
         
-        command = 'scp %s %s@%s:~/%s/models/;' % (weights_fnm, cfg.PI_USERNAME, cfg.PI_HOSTNAME, cfg.PI_DONKEY_ROOT)
-        command += 'scp %s %s@%s:~/%s/models/;' % (json_fnm, cfg.PI_USERNAME, cfg.PI_HOSTNAME, cfg.PI_DONKEY_ROOT)
+        command = 'scp %s %s@%s:~/%s/models/;' % (tflite_fnm, cfg.PI_USERNAME, cfg.PI_HOSTNAME, cfg.PI_DONKEY_ROOT)
         command += 'scp %s %s@%s:~/%s/models/;' % (model_filename, cfg.PI_USERNAME, cfg.PI_HOSTNAME, cfg.PI_DONKEY_ROOT)
     
         print("sending", command)
@@ -253,14 +255,10 @@ def on_best_model(cfg, model, model_filename):
         server = host
         files = []
 
-        localpath = weights_fnm
-        remotepath = '/home/%s/%s/%s' %(username, cfg.PI_DONKEY_ROOT, weights_fnm.replace('\\', '/'))
+        localpath = tflite_fnm
+        remotepath = '/home/%s/%s/%s' %(username, cfg.PI_DONKEY_ROOT, tflite_fnm.replace('\\', '/'))
         files.append((localpath, remotepath))
-
-        localpath = json_fnm
-        remotepath = '/home/%s/%s/%s' %(username, cfg.PI_DONKEY_ROOT, json_fnm.replace('\\', '/'))
-        files.append((localpath, remotepath))
-
+        
         localpath = model_filename
         remotepath = '/home/%s/%s/%s' %(username, cfg.PI_DONKEY_ROOT, model_filename.replace('\\', '/'))
         files.append((localpath, remotepath))
@@ -304,6 +302,21 @@ def train(cfg, tub_names, model_name, transfer_model, model_type, continuous, au
     else:
         shadow_images = None
 
+    if "tflite" in model_type:
+        #even though we are passed the .tflite output file, we train with an intermediate .h5
+        #output and then convert to final .tflite at the end.
+        assert(".tflite" in model_name)
+        #we only support the linear model type right now for tflite
+        assert("linear" in model_type)
+        model_name = model_name.replace(".tflite", ".h5")
+    elif "tensorrt" in model_type:
+        #even though we are passed the .uff output file, we train with an intermediate .h5
+        #output and then convert to final .uff at the end.
+        assert(".uff" in model_name)
+        #we only support the linear model type right now for tensorrt
+        assert("linear" in model_type)
+        model_name = model_name.replace(".uff", ".h5")
+
     if model_name and not '.h5' == model_name[-3:]:
         raise Exception("Model filename should end with .h5")
     
@@ -313,7 +326,12 @@ def train(cfg, tub_names, model_name, transfer_model, model_type, continuous, au
     gen_records = {}
     opts = { 'cfg' : cfg}
 
-    kl = get_model_by_type(model_type, cfg=cfg)
+    if "linear" in model_type:
+        train_type = "linear"
+    else:
+        train_type = model_type
+
+    kl = get_model_by_type(train_type, cfg=cfg)
 
     opts['categorical'] = type(kl) in [KerasCategorical, KerasBehavioral]
 
@@ -340,6 +358,7 @@ def train(cfg, tub_names, model_name, transfer_model, model_type, continuous, au
     
     opts['keras_pilot'] = kl
     opts['continuous'] = continuous
+    opts['model_type'] = model_type
 
     extract_data_from_pickles(cfg, tub_names)
 
@@ -467,7 +486,7 @@ def train(cfg, tub_names, model_name, transfer_model, model_type, continuous, au
                         continue
 
                     img_arr = np.array(inputs_img).reshape(batch_size,\
-                        cfg.IMAGE_H, cfg.IMAGE_W, cfg.IMAGE_DEPTH)
+                        cfg.TARGET_H, cfg.TARGET_W, cfg.TARGET_D)
 
                     if has_imu:
                         X = [img_arr, np.array(inputs_imu)]
@@ -488,6 +507,7 @@ def train(cfg, tub_names, model_name, transfer_model, model_type, continuous, au
                     batch_data = []
     
     model_path = os.path.expanduser(model_name)
+
     
     #checkpoint to save model after each epoch and send best to the pi.
     save_best = MyCPCallback(send_model_cb=on_best_model,
@@ -523,6 +543,8 @@ def train(cfg, tub_names, model_name, transfer_model, model_type, continuous, au
     val_steps = num_val // cfg.BATCH_SIZE
     print('steps_per_epoch', steps_per_epoch)
 
+    cfg.model_type = model_type
+
     go_train(kl, cfg, train_gen, val_gen, gen_records, model_name, steps_per_epoch, val_steps, continuous, verbose, save_best)
 
     # delete_model_dir_if_empty()
@@ -530,6 +552,8 @@ def train(cfg, tub_names, model_name, transfer_model, model_type, continuous, au
     
     
 def go_train(kl, cfg, train_gen, val_gen, gen_records, model_name, steps_per_epoch, val_steps, continuous, verbose, save_best=None):
+
+    start = time.time()
 
     model_path = os.path.expanduser(model_name)
 
@@ -579,7 +603,10 @@ def go_train(kl, cfg, train_gen, val_gen, gen_records, model_name, steps_per_epo
                     
     full_model_val_loss = min(history.history['val_loss'])
     max_val_loss = full_model_val_loss + cfg.PRUNE_VAL_LOSS_DEGRADATION_LIMIT
-    
+
+    duration_train = time.time() - start
+    print("Training completed in %s." % str(datetime.timedelta(seconds=round(duration_train))) )
+
     print("\n\n----------- Best Eval Loss :%f ---------" % save_best.best)
 
     if cfg.SHOW_PLOT:
@@ -619,6 +646,23 @@ def go_train(kl, cfg, train_gen, val_gen, gen_records, model_name, steps_per_epo
                 print("not saving loss graph because matplotlib not set up.")
         except Exception as ex:
             print("problems with loss graph: {}".format( ex ) )
+
+    #Save tflite
+    if "tflite" in cfg.model_type:
+        print("\n\n--------- Saving TFLite Model ---------")
+        tflite_fnm = model_path.replace(".h5", ".tflite")
+        assert(".tflite" in tflite_fnm)
+        from donkeycar.parts.tflite import keras_model_to_tflite
+        keras_model_to_tflite(model_path, tflite_fnm)
+        print("Saved TFLite model:", tflite_fnm)
+
+    #Save tensorrt
+    if "tensorrt" in cfg.model_type:
+        print("\n\n--------- Saving TensorRT Model ---------")
+        # TODO RAHUL
+        # flatten model_path
+        # convert to uff
+        # print("Saved TensorRT model:", uff_filename)
 
     if cfg.PRUNE_CNN:
         base_model_path = splitext(model_name)[0]
@@ -858,12 +902,12 @@ def sequence_train(cfg, tub_names, model_name, transfer_model, model_type, conti
                 
                 if look_ahead:
                     X = [np.array(b_inputs_img).reshape(batch_size,\
-                        cfg.IMAGE_H, cfg.IMAGE_W, cfg.SEQUENCE_LENGTH)]
+                        cfg.TARGET_H, cfg.TARGET_W, cfg.SEQUENCE_LENGTH)]
                     X.append(np.array(b_vec_in))
                     y = np.array(b_labels).reshape(batch_size, (cfg.SEQUENCE_LENGTH + 1) * 2)
                 else:
                     X = [np.array(b_inputs_img).reshape(batch_size,\
-                        cfg.SEQUENCE_LENGTH, cfg.IMAGE_H, cfg.IMAGE_W, cfg.IMAGE_DEPTH)]
+                        cfg.SEQUENCE_LENGTH, cfg.TARGET_H, cfg.TARGET_W, cfg.TARGET_D)]
                     y = np.array(b_labels).reshape(batch_size, 2)
 
                 yield X, y
@@ -887,6 +931,8 @@ def sequence_train(cfg, tub_names, model_name, transfer_model, model_type, conti
     if steps_per_epoch < 2:
         raise Exception("Too little data to train. Please record more records.")
     
+    cfg.model_type = model_type
+
     go_train(kl, cfg, train_gen, val_gen, gen_records, model_name, steps_per_epoch, val_steps, continuous, verbose)
     
     ''' 

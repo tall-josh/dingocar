@@ -14,6 +14,7 @@ import itertools
 import subprocess
 import math
 import random
+import time
 
 from PIL import Image
 import numpy as np
@@ -115,9 +116,25 @@ def rgb2gray(rgb):
     return np.dot(rgb[...,:3], [0.299, 0.587, 0.114])
 
 
+def img_crop(img_arr, top, bottom):
+    
+    if bottom is 0:
+        end = img_arr.shape[0]
+    else:
+        end = -bottom
+    return img_arr[top:end,: ,:]
+
+def normalize_and_crop(img_arr, cfg):
+    img_arr = img_arr.astype(np.float32) / 255.0
+    if cfg.ROI_CROP_TOP or cfg.ROI_CROP_BOTTOM:
+        img_arr = img_crop(img_arr, cfg.ROI_CROP_TOP, cfg.ROI_CROP_BOTTOM)
+    return img_arr
+
+
 def load_scaled_image_arr(filename, cfg):
     '''
     load an image from the filename, and use the cfg to resize if needed
+    also apply cropping and normalize
     '''
     import donkeycar as dk
     try:
@@ -125,13 +142,16 @@ def load_scaled_image_arr(filename, cfg):
         if img.height != cfg.IMAGE_H or img.width != cfg.IMAGE_W:
             img = img.resize((cfg.IMAGE_W, cfg.IMAGE_H))
         img_arr = np.array(img)
+        img_arr = normalize_and_crop(img_arr, cfg)
         if img_arr.shape[2] == 3 and cfg.IMAGE_DEPTH == 1:
             img_arr = dk.utils.rgb2gray(img_arr).reshape(cfg.IMAGE_H, cfg.IMAGE_W, 1)
-    except:
+    except Exception as e:
+        print(e)
         print('failed to load image:', filename)
         img_arr = None
     return img_arr
 
+        
 
 '''
 FILES
@@ -363,6 +383,10 @@ def gather_tubs(cfg, tub_names):
 
     return tubs
 
+"""
+Training helpers
+"""
+
 def get_image_index(fnm):
     sl = os.path.basename(fnm).split('_')
     return int(sl[0])
@@ -392,6 +416,7 @@ def get_model_by_type(model_type, cfg):
     create a Keras model and return it.
     '''
     from donkeycar.parts.keras import KerasRNN_LSTM, KerasBehavioral, KerasCategorical, KerasIMU, KerasLinear, Keras3D_CNN, KerasLocalizer, KerasLatent
+    from donkeycar.parts.tflite import TFLitePilot
  
     if model_type is None:
         model_type = cfg.DEFAULT_MODEL_TYPE
@@ -400,7 +425,9 @@ def get_model_by_type(model_type, cfg):
     input_shape = (cfg.IMAGE_H, cfg.IMAGE_W, cfg.IMAGE_DEPTH)
     roi_crop = (cfg.ROI_CROP_TOP, cfg.ROI_CROP_BOTTOM)
 
-    if model_type == "localizer" or cfg.TRAIN_LOCALIZER:
+    if model_type == "tflite_linear":
+        kl = TFLitePilot()
+    elif model_type == "localizer" or cfg.TRAIN_LOCALIZER:
         kl = KerasLocalizer(num_outputs=2, num_behavior_inputs=len(cfg.BEHAVIOR_LIST), num_locations=cfg.NUM_LOCATIONS, input_shape=input_shape)
     elif model_type == "behavior" or cfg.TRAIN_BEHAVIORS:
         kl = KerasBehavioral(num_outputs=2, num_behavior_inputs=len(cfg.BEHAVIOR_LIST), input_shape=input_shape)        
@@ -408,6 +435,11 @@ def get_model_by_type(model_type, cfg):
         kl = KerasIMU(num_outputs=2, num_imu_inputs=6, input_shape=input_shape)        
     elif model_type == "linear":
         kl = KerasLinear(input_shape=input_shape, roi_crop=roi_crop)
+    elif model_type == "tensorrt_linear":
+        # Aggressively lazy load this. This module imports pycuda.autoinit which causes a lot of unexpected things
+        # to happen when using TF-GPU for training.
+        from donkeycar.parts.tensorrt import TensorRTLinear
+        kl = TensorRTLinear(cfg=cfg)
     elif model_type == "3d":
         kl = Keras3D_CNN(image_w=cfg.IMAGE_W, image_h=cfg.IMAGE_H, image_d=cfg.IMAGE_DEPTH, seq_length=cfg.SEQUENCE_LENGTH)
     elif model_type == "rnn":
@@ -426,10 +458,11 @@ def get_test_img(model):
     query the input to see what it likes
     make an image capable of using with that test model
     '''
+    assert(len(model.inputs) > 0)
     try:
         count, h, w, ch = model.inputs[0].get_shape()
         seq_len = 0
-    except:
+    except Exception as e:
         count, seq_len, h, w, ch = model.inputs[0].get_shape()
 
     #generate random array in the right shape
@@ -463,4 +496,25 @@ def train_test_split(data_list, shuffle=True, test_size=0.2):
 
     return train_data, val_data
     
-    
+
+
+"""
+Timers
+"""
+
+class FPSTimer(object):
+    def __init__(self):
+        self.t = time.time()
+        self.iter = 0
+
+    def reset(self):
+        self.t = time.time()
+        self.iter = 0
+
+    def on_frame(self):
+        self.iter += 1
+        if self.iter == 100:
+            e = time.time()
+            print('fps', 100.0 / (e - self.t))
+            self.t = time.time()
+            self.iter = 0
