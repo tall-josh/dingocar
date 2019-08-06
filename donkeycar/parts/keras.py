@@ -148,9 +148,12 @@ class KerasLinear(KerasPilot):
     Keras Dense layer with linear activation. One each for steering and throttle.
     The output is not bounded.
     '''
-    def __init__(self, num_outputs=2, input_shape=(120, 160, 3), roi_crop=(0, 0), *args, **kwargs):
+    def __init__(self, num_outputs=2, input_shape=(120, 160, 3), roi_crop=(0, 0), model=None, *args, **kwargs):
         super(KerasLinear, self).__init__(*args, **kwargs)
-        self.model = default_n_linear(num_outputs, input_shape, roi_crop)
+        if model is not None:
+            self.model = model
+        else:
+            self.model = default_n_linear(num_outputs, input_shape, roi_crop)
         self.compile()
 
     def compile(self):
@@ -285,12 +288,9 @@ def default_categorical(input_shape=(120, 160, 3), roi_crop=(0, 0)):
 
     opt = keras.optimizers.Adam()
     drop = 0.2
-<<<<<<< HEAD
-=======
 
     #we now expect that cropping done elsewhere. we will adjust our expeected image size here:
     input_shape = adjust_input_shape(input_shape, roi_crop)
->>>>>>> origin
 
     img_in = Input(shape=input_shape, name='img_in')                      # First layer, input layer, Shape comes from camera.py resolution, RGB
     x = img_in

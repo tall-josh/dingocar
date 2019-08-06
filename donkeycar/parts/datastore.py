@@ -17,6 +17,7 @@ import pandas as pd
 
 from PIL import Image
 
+random.seed(42)
 
 class Tub(object):
     """
@@ -372,8 +373,8 @@ class Tub(object):
 
                 if record_transform:
                     record_dict = record_transform(record_dict)
-
-                record_dict = self.read_record(record_dict)
+                else:
+                    record_dict = self.read_record(record_dict)
 
                 yield record_dict
 
@@ -412,7 +413,7 @@ class Tub(object):
             yield X, Y
 
 
-    def get_train_val_gen(self, X_keys, Y_keys, batch_size=128, record_transform=None, train_frac=.8):
+    def get_train_val_gen(self, X_keys, Y_keys, batch_size=128, record_transform=None, valid_transform=None, train_frac=.8):
         train_df = train=self.df.sample(frac=train_frac,random_state=200)
         val_df = self.df.drop(train_df.index)
 
@@ -420,7 +421,7 @@ class Tub(object):
                                        record_transform=record_transform, df=train_df)
 
         val_gen = self.get_train_gen(X_keys=X_keys, Y_keys=Y_keys, batch_size=batch_size,
-                                       record_transform=record_transform, df=val_df)
+                                       record_transform=valid_transform, df=val_df)
 
         return train_gen, val_gen
 
