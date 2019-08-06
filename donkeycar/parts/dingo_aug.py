@@ -17,6 +17,10 @@ def mirror_image(I):
 def mirror_about_y(img_arr):
     return np.fliplr(img_arr)
 
+def jitter(value, min_delta, max_delta):
+    offset = np.random.uniform(low=min_delta, high=max_delta)
+    return value + offset
+
 def salt_and_pepper(img_arr, prob=0.333):
     bools = np.array([True, False])
     probs = np.array([prob/2, 1-(prob/2)])

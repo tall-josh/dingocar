@@ -4,7 +4,10 @@ Scripts to drive a donkey 2 car
 
 Usage:
     manage.py (drive) [--model=<model>] [--js] [--type=(linear|categorical|rnn|imu|behavior|3d|localizer|latent)] [--camera=(single|stereo)] [--meta=<key:value> ...]
-    manage.py (train) [--tub=<tub1,tub2,..tubn>] [--file=<file> ...] (--model=<model>) [--transfer=<model>] [--type=(linear|categorical|rnn|imu|behavior|3d|localizer)] [--continuous] [--aug]
+    manage.py (train) [--tub=<tub1,tub2,..tubn>] [--file=<file> ...]
+    (--model=<model>) [--transfer=<model>]
+    [--type=(linear|categorical|rnn|imu|behavior|3d|localizer)] [--continuous]
+    [--aug] [--notes=<notes>]
 
 
 Options:
@@ -29,18 +32,20 @@ from donkeycar.parts.throttle_filter import ThrottleFilter
 from donkeycar.parts.behavior import BehaviorPart
 from donkeycar.parts.file_watcher import FileWatcher
 from donkeycar.parts.launch import AiLaunch
+from scripts.input_with_timeout import timeout_input
 
 def prepare_dingo_car_style_archive(tub_path, info_json, data_path, remote_dst=None, port=2050):
         from scripts.organize_tub import archive_tub, delete_tub, rsync
-        choice = input(("What would you like to do with this data?\n"
-                               "(z)ip and ship, (d)elet, (l)eave me alone! : "))
+        choice = timeout_input(("What would you like to do with this data?\n"
+                               "(z)ip and ship, (d)elet, (l)eave me alone!"),
+                               10, default='l')
         while choice.lower() not in ['d', 'z', 'l']:
             choice = intput("Please enter 'y' or 'n': ")
 
         if choice.lower() == 'z':
 
             #tub_path = os.path.join(cfg.CAR_PATH, "tub")
-            message  = input("Leave a comment: ")
+            message  = timeout_input("Leave a comment.", 10, default="")
             outdir   = archive_tub(tub_path,
                                    info_json,
                                    data_path,
@@ -594,22 +599,30 @@ if __name__ == '__main__':
 
     if args['train']:
         from train import multi_train, preprocessFileList
+        from scripts.make_model_name import process_dingo_archives_gen_model_path, update_model_info
 
-        tub = args['--tub']
-        model = args['--model']
-        transfer = args['--transfer']
+        tub        = args['--tub']
+        model      = args['--model']
+        transfer   = args['--transfer']
         model_type = args['--type']
         continuous = args['--continuous']
-        aug = args['--aug']
+        aug        = args['--aug']
+        notes      = args['--notes']
 
         dirs = preprocessFileList( args['--file'] )
         if tub is not None:
             tub_paths = [os.path.expanduser(n) for n in tub.split(',')]
             dirs.extend( tub_paths )
 
-        if all_dingo_tub_archives(dirs):
-            from scripts.make_model_name import process_dingo_archives_gen_model_path
-            model, dirs = process_dingo_archives_gen_model_path(dirs, cfg.MODELS_PATH, cfg)
+        model_dir, dirs = process_dingo_archives_gen_model_path(dirs,
+                cfg.MODELS_PATH, cfg, aug)
+        model = os.path.join(model_dir, "model.h5")
+
+        # Save some info about the training run
+        update_model_info(model_dir, "args", args)
+        if transfer:
+            update_model_info(model_dir, "transfer", transfer)
+        if notes:
+            update_model_info(model_dir, "notes", notes)
 
         multi_train(cfg, dirs, model, transfer, model_type, continuous, aug)
-

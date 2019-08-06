@@ -98,7 +98,7 @@ def load_shadow_image_without_alpha_channel(path_mask):
     '''
     return filenames
 
-def dingo_aug(cfg, np_img, steering_angle, shadow_images=None):
+def dingo_aug(cfg, np_img, steering_angle, throttle, shadow_images=None):
 
     aug = cfg.AUG_MIRROR_STEERING
     if aug is not None and random_bool(aug[0]):
@@ -137,10 +137,23 @@ def dingo_aug(cfg, np_img, steering_angle, shadow_images=None):
         frac_max = aug[2]
         np_img   = blockout(np_img, frac_min, frac_max)
 
+    aug = cfg.AUG_JITTER_STEERING
+    if aug is not None and random_bool(aug[0]):
+        min_delta = aug[1]
+        max_delta = aug[2]
+        steering  = jitter(steering_angle, aug[1], aug[2])
+
+    aug = cfg.AUG_JITTER_THROTTLE
+    if aug is not None and random_bool(aug[0]):
+        min_delta = aug[1]
+        max_delta = aug[2]
+        throttle  = jitter(throttle, aug[1], aug[2])
+
+
     if cfg.AUG_NORMALIZE:
         np_img = np.divide(np_img, 255.)
 
-    return np_img, steering_angle
+    return np_img, steering_angle, throttle
 
 def random_bool(true_prob):
     return np.random.choice([True, False], 1, p=[true_prob, 1.-true_prob])

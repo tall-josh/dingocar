@@ -38,7 +38,6 @@ from donkeycar.parts.keras import KerasLinear, KerasIMU,\
 from donkeycar.parts.augment import dingo_aug, load_shadow_image_without_alpha_channel
 from donkeycar.utils import *
 
-
 '''
 matplotlib can be a pain to setup on a Mac. So handle the case where it is absent. When present,
 use it to generate a plot of training results.
@@ -302,6 +301,8 @@ def train(cfg, tub_names, model_name, transfer_model, model_type, continuous, au
                "'{cfg.AUG_SHADOW_IMAGES_PATTERN}' \n"
                "set cfg.AUG_SHADOW_IMAGES_PATTERN to None or check the "
                "pattern")
+    else:
+        shadow_images = None
 
     if model_name and not '.h5' == model_name[-3:]:
         raise Exception("Model filename should end with .h5")
@@ -417,10 +418,11 @@ def train(cfg, tub_names, model_name, transfer_model, model_type, continuous, au
                     inputs_img = []
                     inputs_imu = []
                     inputs_bvh = []
-                    angles = []
-                    throttles = []
-                    out_img = []
+                    angles     = []
+                    throttles  = []
+                    out_img    = []
 
+                    i = 0
                     for record in batch_data:
                         #get image data if we don't already have it
                         if record['img_data'] is None:
@@ -431,18 +433,10 @@ def train(cfg, tub_names, model_name, transfer_model, model_type, continuous, au
                             if img_arr is None:
                                 break
                             
-                            if aug:
-                                img_arr, angle = dingo_aug(cfg,
-                                                           img_arr,
-                                                           record['angle'],
-                                                           shadow_images = shadow_images)
-                                                           #do_warp_persp = cfg.AUG_WARP_PERSPECTIVE)
-                                record['angle'] = angle
-
                             if cfg.CACHE_IMAGES:
-                                record['img_data'] = img_arr
+                                record['img_data'] = img_arr.copy()
                         else:
-                            img_arr = record['img_data']
+                            img_arr = record['img_data'].copy()
                             
                         if img_out:                            
                             rz_img_arr = cv2.resize(img_arr, (127, 127)) / 255.0
@@ -454,9 +448,20 @@ def train(cfg, tub_names, model_name, transfer_model, model_type, continuous, au
                         if has_bvh:
                             inputs_bvh.append(record['behavior_arr'])
 
+                        # only apply aug to training set.
+                        angle    = record['angle']
+                        throttle = record['throttle']
+                        if aug and isTrainSet:
+                            img_arr, angle, throttle = dingo_aug(cfg,
+                                                       img_arr,
+                                                       angle,
+                                                       throttle,
+                                                       shadow_images = shadow_images)
+                                                       #do_warp_persp = cfg.AUG_WARP_PERSPECTIVE)
+
                         inputs_img.append(img_arr)
-                        angles.append(record['angle'])
-                        throttles.append(record['throttle'])
+                        angles.append(angle)
+                        throttles.append(throttle)
 
                     if img_arr is None:
                         continue
@@ -520,6 +525,8 @@ def train(cfg, tub_names, model_name, transfer_model, model_type, continuous, au
 
     go_train(kl, cfg, train_gen, val_gen, gen_records, model_name, steps_per_epoch, val_steps, continuous, verbose, save_best)
 
+    # delete_model_dir_if_empty()
+
     
     
 def go_train(kl, cfg, train_gen, val_gen, gen_records, model_name, steps_per_epoch, val_steps, continuous, verbose, save_best=None):
@@ -578,11 +585,11 @@ def go_train(kl, cfg, train_gen, val_gen, gen_records, model_name, steps_per_epo
     if cfg.SHOW_PLOT:
         try:
             if do_plot:
-                plt.figure(1)
+                plt.figure(1);
 
                 # Only do accuracy if we have that data (e.g. categorical outputs)
                 if 'angle_out_acc' in history.history:
-                    plt.subplot(121)
+                    plt.subplot(121);
 
                 # summarize history for loss
                 plt.plot(history.history['loss'])
@@ -602,8 +609,12 @@ def go_train(kl, cfg, train_gen, val_gen, gen_records, model_name, steps_per_epo
                     plt.xlabel('epoch')
                     #plt.legend(['train', 'validate'], loc='upper left')
 
-                plt.savefig(model_path + '_loss_acc_%f.png' % save_best.best)
-                plt.show()
+                model_dir = os.path.dirname(model_path)
+                fig_path  = os.path.join(model_dir,
+                                       f"plot_loss_acc_{save_best.best}.png")
+                plt.savefig(fig_path)
+                plt.close()
+                #plt.show()
             else:
                 print("not saving loss graph because matplotlib not set up.")
         except Exception as ex:
@@ -805,23 +816,29 @@ def sequence_train(cfg, tub_names, model_name, transfer_model, model_type, conti
                     for iRec, record in enumerate(seq):
                         #get image data if we don't already have it
                         if len(inputs_img) < num_images_target:
+                            angle    = record['angle']
+                            throttle = record['throttle']
                             if record['img_data'] is None:
                                 img_arr = load_scaled_image_arr(record['image_path'], cfg)
                                 if img_arr is None:
                                     break
                                 if aug:
-                                    img_arr = augment_image(img_arr)
+                                    img_arr, angle, throttle = dingo_aug(cfg,
+                                                               img_arr,
+                                                               angle,
+                                                               throttle,
+                                                               shadow_images = shadow_images)
                                 
                                 if cfg.CACHE_IMAGES:
-                                    record['img_data'] = img_arr
+                                    record['img_data'] = img_arr.copy()
                             else:
-                                img_arr = record['img_data']                  
+                                img_arr = record['img_data'].copy() 
                                 
                             inputs_img.append(img_arr)
 
                         if iRec >= iTargetOutput:
-                            vec_out.append(record['angle'])
-                            vec_out.append(record['throttle'])
+                            vec_out.append(angle)
+                            vec_out.append(throttle)
                         else:
                             vec_in.append(0.0) #record['angle'])
                             vec_in.append(0.0) #record['throttle'])

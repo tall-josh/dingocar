@@ -26,12 +26,8 @@ INFO_PATH   = os.path.join(CAR_PATH, "info.json")
 # CAR_PATH because it will resolve to the mycar dir on the pi/nano NOT your 
 # laptop. The inverse is true for RSYNC_MODEL_DST. So you'll need to type the
 # full path manually.
-
-# Only needed on main computer (not car)
 RSYNC_DATA_DST  = "TO BE FILLED BEFORE YOU START. SHOULD LOOK SOMETHING LIKE:"
                    # username@localhost:/home/username/where/to/store/data/"
-
-# Only needed on car (not main computer)
 RSYNC_MODEL_DST = "TO BE FILLED BEFORE YOU START. SHOULD LOOK SOMETHING LIKE:"
                    # piusername@localhost:/home/piusername/where/to/store/models/
 
@@ -139,16 +135,17 @@ NUM_LAST_LAYERS_TO_TRAIN = 7        #when freezing layers, how many layers from 
 # zeroth element of the tuple is always the probabilty the given augmenation
 # operation will be performed. The other elements are variabls specific to the 
 # operation itself.
-#                                  PROB   X   Y
-AUG_MIRROR_STEERING       = None #(0.5,)
-AUG_SALT_AND_PEPPER       = None #(0.2,  0.1)       # Turn pixel black or white with X probablilty.
-AUG_100S_AND_1000S        = None #(0.2,  0.1)       # Turn pixel random rgb color with X probablilty.
-AUG_PIXEL_SATURATION      = None #(0.2,  10, 30)    # Select a number between X and Y and add it all the pixel values. Clip if above 255 or below 0.
-AUG_SHUFFLE_CHANNELS      = None #(0.2,)             # Shuffle RGB channels
-#AUG_SHADOW_IMAGES_PATTERN =None # "/home/users/josh/toy_datasets/coco_subset/0000000222*.jpg"
-AUG_SHADOW_IMAGES_PATTERN = None #"/home/jp/Documents/data/coco_5000_subset/0000000222*.jpg"
-AUG_SHADOW_IMAGES         = None #(0.2, 0.2,  0.5)   # Blend a randomly selected image over the training image with a transparncy (alpha) between X and Y
-AUG_BLOCKOUT              = None #(0.2, 0.02, 0.07) # Set a portion of the image to zero. Size of the block is a random fraction of the image size between X and Y
+#                           PROB    X   Y
+AUG_MIRROR_STEERING       = None# (0.5,)
+AUG_SALT_AND_PEPPER       = None# (0.2,  0.1)       # Turn pixel black or white with X probablilty.
+AUG_100S_AND_1000S        = None# (0.2,  0.1)       # Turn pixel random rgb color with X probablilty.
+AUG_PIXEL_SATURATION      = None# (0.2,  10, 60)    # Select a number between X and Y and add it all the pixel values. Clip if above 255 or below 0.
+AUG_SHUFFLE_CHANNELS      = None# (0.2,)             # Shuffle RGB channels
+AUG_SHADOW_IMAGES_PATTERN = None# "/pattern/to/glob/for/shadow/images*.jpg"
+AUG_SHADOW_IMAGES         = None# (0.2, 0.4)   # Blend a randomly selected image over the training image with a transparncy (alpha) between X and Y
+AUG_BLOCKOUT              = None# (0.2, 0.15, 0.40) # Set a portion of the image to zero. Size of the block is a random fraction of the image size between X and Y
+AUG_JITTER_STEERING       = None# (0.2, -0.1, 0.1)  # Pertabate steering command
+AUG_JITTER_THROTTLE       = None# (0.2,  0.0, 0.1)  # Pertabate throttle command
 AUG_NORMALIZE             = False
 AUG_WARP_PERSPECTIVE      = False
 
