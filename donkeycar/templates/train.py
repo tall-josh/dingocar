@@ -10,11 +10,12 @@ Basic usage should feel familiar: python train.py --model models/mypilot
 
 
 Usage:
-    train.py [--tub=<tub1,tub2,..tubn>] [--file=<file> ...] (--model=<model>) [--transfer=<model>] [--type=(linear|latent|categorical|rnn|imu|behavior|3d|look_ahead)] [--continuous] [--aug]
+    train.py [--tub=<tub1,tub2,..tubn>] [--file=<file> ...] (--model=<model>) [--transfer=<model>] [--type=(linear|latent|categorical|rnn|imu|behavior|3d|look_ahead|tensorrt_linear|tflite_linear|coral_tflite_linear)] [--figure_format=<figure_format>] [--continuous] [--aug]
 
 Options:
-    -h --help        Show this screen.
-    -f --file=<file> A text file containing paths to tub files, one per line. Option may be used more than once.
+    -h --help              Show this screen.
+    -f --file=<file>       A text file containing paths to tub files, one per line. Option may be used more than once.
+    --figure_format=png    The file format of the generated figure (see https://matplotlib.org/api/_as_gen/matplotlib.pyplot.savefig.html), e.g. 'png', 'pdf', 'svg', ...
 """
 import os
 import glob
@@ -35,9 +36,11 @@ import donkeycar as dk
 from donkeycar.parts.datastore import Tub
 from donkeycar.parts.keras import KerasLinear, KerasIMU,\
      KerasCategorical, KerasBehavioral, Keras3D_CNN,\
-     KerasRNN_LSTM, KerasLatent
+     KerasRNN_LSTM, KerasLatent, KerasLocalizer
 from donkeycar.parts.augment import augment_image
 from donkeycar.utils import *
+
+figure_format = 'png'
 
 
 '''
@@ -129,6 +132,13 @@ def collate_records(records, gen_records, opts):
         except:
             pass
 
+        try:
+            location_arr = np.array(json_data['location/one_hot_state_array'])
+            sample["location"] = location_arr
+        except:
+            pass
+
+
         sample['img_data'] = None
 
         # Initialise 'train' to False
@@ -214,15 +224,8 @@ class MyCPCallback(keras.callbacks.ModelCheckpoint):
 
 def on_best_model(cfg, model, model_filename):
 
-    model.save(model_filename)
-    return #TODO can we save a tfilte on the fly?
-    
-    #Save tflite file too
-    tflite_fnm = model_filename.replace(".h5", ".tflite")
-    assert(".tflite" in tflite_fnm)
-    from donkeycar.parts.tflite import keras_session_to_tflite
-    keras_session_to_tflite(model, tflite_fnm)
-
+    model.save(model_filename, include_optimizer=False)
+        
     if not cfg.SEND_BEST_MODEL_TO_PI:
         return
 
@@ -233,8 +236,7 @@ def on_best_model(cfg, model, model_filename):
     if not on_windows:
         print('sending model to the pi')
         
-        command = 'scp %s %s@%s:~/%s/models/;' % (tflite_fnm, cfg.PI_USERNAME, cfg.PI_HOSTNAME, cfg.PI_DONKEY_ROOT)
-        command += 'scp %s %s@%s:~/%s/models/;' % (model_filename, cfg.PI_USERNAME, cfg.PI_HOSTNAME, cfg.PI_DONKEY_ROOT)
+        command = 'scp %s %s@%s:~/%s/models/;' % (model_filename, cfg.PI_USERNAME, cfg.PI_HOSTNAME, cfg.PI_DONKEY_ROOT)
     
         print("sending", command)
         res = os.system(command)
@@ -242,9 +244,9 @@ def on_best_model(cfg, model, model_filename):
 
     else: #yes, we are on windows machine
 
-    #On windoz no scp. In oder to use this you must first setup
-    #an ftp daemon on the pi. ie. sudo apt-get install vsftpd
-    #and then make sure you enable write permissions in the conf
+        #On windoz no scp. In order to use this you must first setup
+        #an ftp daemon on the pi. ie. sudo apt-get install vsftpd
+        #and then make sure you enable write permissions in the conf
         try:
             import paramiko
         except:
@@ -256,10 +258,6 @@ def on_best_model(cfg, model, model_filename):
         server = host
         files = []
 
-        localpath = tflite_fnm
-        remotepath = '/home/%s/%s/%s' %(username, cfg.PI_DONKEY_ROOT, tflite_fnm.replace('\\', '/'))
-        files.append((localpath, remotepath))
-        
         localpath = model_filename
         remotepath = '/home/%s/%s/%s' %(username, cfg.PI_DONKEY_ROOT, model_filename.replace('\\', '/'))
         files.append((localpath, remotepath))
@@ -289,6 +287,9 @@ def train(cfg, tub_names, model_name, transfer_model, model_type, continuous, au
     saves the output trained model as model_name
     ''' 
     verbose = cfg.VEBOSE_TRAIN
+
+    if model_type is None:
+        model_type = cfg.DEFAULT_MODEL_TYPE
 
     if "tflite" in model_type:
         #even though we are passed the .tflite output file, we train with an intermediate .h5
@@ -399,6 +400,7 @@ def train(cfg, tub_names, model_name, transfer_model, model_type, continuous, au
             has_imu = type(kl) is KerasIMU
             has_bvh = type(kl) is KerasBehavioral
             img_out = type(kl) is KerasLatent
+            loc_out = type(kl) is KerasLocalizer
             
             if img_out:
                 import cv2
@@ -429,6 +431,8 @@ def train(cfg, tub_names, model_name, transfer_model, model_type, continuous, au
                     angles = []
                     throttles = []
                     out_img = []
+                    out_loc = []
+                    out = []
 
                     for record in batch_data:
                         #get image data if we don't already have it
@@ -451,6 +455,9 @@ def train(cfg, tub_names, model_name, transfer_model, model_type, continuous, au
                         if img_out:                            
                             rz_img_arr = cv2.resize(img_arr, (127, 127)) / 255.0
                             out_img.append(rz_img_arr[:,:,0].reshape((127, 127, 1)))
+
+                        if loc_out:
+                            out_loc.append(record['location'])
                             
                         if has_imu:
                             inputs_imu.append(record['imu_array'])
@@ -461,6 +468,7 @@ def train(cfg, tub_names, model_name, transfer_model, model_type, continuous, au
                         inputs_img.append(img_arr)
                         angles.append(record['angle'])
                         throttles.append(record['throttle'])
+                        out.append([record['angle'], record['throttle']])
 
                     if img_arr is None:
                         continue
@@ -477,8 +485,10 @@ def train(cfg, tub_names, model_name, transfer_model, model_type, continuous, au
 
                     if img_out:
                         y = [out_img, np.array(angles), np.array(throttles)]
+                    elif out_loc:
+                        y = [ np.array(angles), np.array(throttles), np.array(out_loc)]
                     elif model_out_shape[1] == 2:
-                        y = [np.array([angles, throttles])]
+                        y = [np.array([out]).reshape(batch_size, 2) ]
                     else:
                         y = [np.array(angles), np.array(throttles)]
 
@@ -614,21 +624,60 @@ def go_train(kl, cfg, train_gen, val_gen, gen_records, model_name, steps_per_epo
                     plt.xlabel('epoch')
                     #plt.legend(['train', 'validate'], loc='upper left')
 
-                plt.savefig(model_path + '_loss_acc_%f.png' % save_best.best)
+                plt.savefig(model_path + '_loss_acc_%f.%s' % (save_best.best, figure_format))
                 plt.show()
             else:
                 print("not saving loss graph because matplotlib not set up.")
         except Exception as ex:
             print("problems with loss graph: {}".format( ex ) )
 
-    #Save tflite
+    #Save tflite, optionally in the int quant format for Coral TPU
     if "tflite" in cfg.model_type:
         print("\n\n--------- Saving TFLite Model ---------")
         tflite_fnm = model_path.replace(".h5", ".tflite")
         assert(".tflite" in tflite_fnm)
+
+        prepare_for_coral = "coral" in cfg.model_type
+
+        if prepare_for_coral:
+            #compile a list of records to calibrate the quantization
+            data_list = []
+            max_items = 1000
+            for key, _record in gen_records.items():
+                data_list.append(_record)
+                if len(data_list) == max_items:
+                    break   
+
+            stride = 1
+            num_calibration_steps = len(data_list) // stride
+
+            #a generator function to help train the quantizer with the expected range of data from inputs
+            def representative_dataset_gen():
+                start = 0
+                end = stride
+                for _ in range(num_calibration_steps):
+                    batch_data = data_list[start:end]
+                    inputs = []
+                
+                    for record in batch_data:
+                        filename = record['image_path']                        
+                        img_arr = load_scaled_image_arr(filename, cfg)
+                        inputs.append(img_arr)
+
+                    start += stride
+                    end += stride
+
+                    # Get sample input data as a numpy array in a method of your choosing.
+                    yield [ np.array(inputs, dtype=np.float32).reshape(stride, cfg.TARGET_H, cfg.TARGET_W, cfg.TARGET_D) ]
+        else:
+            representative_dataset_gen = None
+
         from donkeycar.parts.tflite import keras_model_to_tflite
-        keras_model_to_tflite(model_path, tflite_fnm)
+        keras_model_to_tflite(model_path, tflite_fnm, representative_dataset_gen)
         print("Saved TFLite model:", tflite_fnm)
+        if prepare_for_coral:
+            print("compile for Coral w: edgetpu_compiler", tflite_fnm)
+            os.system("edgetpu_compiler " + tflite_fnm)
 
     #Save tensorrt
     if "tensorrt" in cfg.model_type:
@@ -760,6 +809,7 @@ def sequence_train(cfg, tub_names, model_name, transfer_model, model_type, conti
         sample['target_output'] = np.array([angle, throttle])
         sample['angle'] = angle
         sample['throttle'] = throttle
+
 
         sample['img_data'] = None
 
@@ -1047,6 +1097,8 @@ if __name__ == "__main__":
     model = args['--model']
     transfer = args['--transfer']
     model_type = args['--type']
+    if args['--figure_format']:
+        figure_format = args['--figure_format']
     continuous = args['--continuous']
     aug = args['--aug']
     

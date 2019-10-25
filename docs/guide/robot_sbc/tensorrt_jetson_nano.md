@@ -32,7 +32,7 @@ nvcc --version
 
 You should see something like:
 
-```
+```text
 nvcc: NVIDIA (R) Cuda compiler driver
 Copyright (c) 2005-2018 NVIDIA Corporation
 Built on ...
@@ -78,7 +78,7 @@ Now copy the converted `uff` model and the `metadata` to your Jetson Nano.
 
 ## Step 4
 
-* In `config.py` pick the model type as `tensorrt_linear`.
+* In `myconfig.py` pick the model type as `tensorrt_linear`.
 
 ```python
 DEFAULT_MODEL_TYPE = `tensorrt_linear`
