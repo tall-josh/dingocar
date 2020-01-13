@@ -7,5 +7,8 @@
 cp dingo_ui_boot.service /etc/systemd/system
 systemctl enable dingo_ui_boot.service
 
+# Currently, 
 cp dingo_ui_halt.service /etc/systemd/system
-systemctl enable dingo_ui_halt.service
+systemctl disable dingo_ui_halt.service
+
+systemctl daemon-reload

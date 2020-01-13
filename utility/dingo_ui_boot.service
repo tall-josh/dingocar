@@ -3,13 +3,12 @@ Description=Start DingoCar control and monitoring
 After=network.target
 
 [Service]
-Type=oneshot
-ExecStart=/home/pi/play/ai/dingocar/utility/dingo_ui.sh Boot
-ExecStop=/home/pi/play/ai/dingocar/utility/dingo_ui.sh Halting
+ExecStart=/home/pi/play/ai/dingocar/utility/dingo_env.sh dingo_ui.py
+ExecStop=/home/pi/play/ai/dingocar/utility/dingo_env.sh oled_message.py Halting
 WorkingDirectory=/home/pi/play/ai/dingocar/utility
 StandardOutput=inherit
 StandardError=inherit
-RemainAfterExit=true
+Restart=always
 User=pi
 
 [Install]
