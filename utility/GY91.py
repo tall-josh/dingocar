@@ -1,14 +1,16 @@
 # coding: utf-8
-## @package MPU9250
+## @package GY91
 #  This is a FaBo9Axis_MPU9250 library for the FaBo 9AXIS I2C Brick.
-#
 #  http://fabo.io/202.html
+#  FaBo <info@fabo.io>
+#
+# Further modified by Cary Dreelan to include the BMP280 sensor data 
+# that is also on thy GY91 IMU/MPU board
 #
 #  Released under APACHE LICENSE, VERSION 2.0
 #
 #  http://www.apache.org/licenses/
 #
-#  FaBo <info@fabo.io>
 
 # import smbus   # CD - leverage the i2c bus from the Adafruit libs
 import time
