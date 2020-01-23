@@ -30,14 +30,17 @@ from PIL import ImageFont
 
 import subprocess
 import time
+import signal
+
+# IMU library
+import GY91
 
 # MCP3021 is DingoCar PCB battery voltage ADC on I2C bus
-
 def get_battery_voltage():
     MCP3021_I2CADDR = 0x4d  # default address
     MCP3021_RATIO = 0.0169  # to times ADC value to conv to voltage based on our voltage divider
 
-    adc_val = disp._i2c._bus.read_word_data(MCP3021_I2CADDR, 0)
+    adc_val = i2cbus.read_word_data(MCP3021_I2CADDR, 0)
 
     # from this data we need the last 4 bits and the first 6.
     last_4 = adc_val & 0b1111  # using a bit mask
@@ -48,6 +51,20 @@ def get_battery_voltage():
     vratio = last_4 << 6 | first_6
 
     return round(vratio * MCP3021_RATIO, 2)
+
+# Signal catcher to handle graceful termination of process (e.g. shutdown/poweroff/ctrl-C)
+def exit_gracefully(signum, frame):
+    # Display halting message before exiting
+    image = Image.new('1', (width, height))
+    draw = ImageDraw.Draw(image)
+    draw.text((0, 0), "HALTING", font=font, fill=255)
+    image = image.rotate(180)
+    disp.image(image)
+    disp.display()
+    raise(SystemExit)
+
+signal.signal(signal.SIGINT, exit_gracefully)
+signal.signal(signal.SIGTERM, exit_gracefully)
 
 # Raspberry Pi pin configuration:
 RST = None     # on the PiOLED this pin isnt used
@@ -62,6 +79,12 @@ disp = Adafruit_SSD1306.SSD1306_128_64(rst=RST)
 disp.begin()
 disp.clear()
 disp.display()
+
+# Access the same i2c bus that the Adafruit lib uses 
+i2cbus = disp._i2c._bus
+
+# Now have i2c bus, initialise the GY91 module
+gy91 = GY91.GY91(bus=i2cbus)
 
 # Create blank image for drawing.
 # Make sure to create image with mode '1' for 1-bit color.
@@ -84,30 +107,88 @@ font = ImageFont.load_default()
 # Some other nice fonts to try: http://www.dafont.com/bitmap.php
 # font = ImageFont.truetype('Minecraftia.ttf', 8)
 
+# Can display multiple pages, which one to display
+currentPage = 0 # select which page/group of info to display
+framesDisplayed = 0 # increment each time we do an update
+
 while True:
+    # Setup and draw for every page type
     draw.rectangle((0,0,width,height), outline=0, fill=0)
-
-    # Shell scripts for system monitoring from here : https://unix.stackexchange.com/questions/119126/command-to-display-memory-usage-disk-usage-and-cpu-load
-    cmd = "hostname -I | cut -d\' \' -f1"
-    IP = subprocess.check_output(cmd, shell = True ).decode('utf-8')
-    cmd = "top -bn1 | grep load | awk '{printf \"CPU Load: %.2f\", $(NF-2)}'"
-    CPU = subprocess.check_output(cmd, shell = True ).decode('utf-8')      
-    cmd = "free -m | awk 'NR==2{printf \"Mem: %s/%sMB %.2f%%\", $3,$2,$3*100/$2 }'"
-    MemUsage = subprocess.check_output(cmd, shell = True ).decode('utf-8')      
-    cmd = "df -h | awk '$NF==\"/\"{printf \"Disk: %d/%dGB %s\", $3,$2,$5}'"
-    Disk = subprocess.check_output(cmd, shell = True ).decode('utf-8')      
-
-    # Battery Voltage
     battery = get_battery_voltage()
-
     draw.text((x, top),       "DingoCar",  font=font, fill=255)
-    draw.text((x, top+8),     "Battery:" + str(battery),  font=font, fill=255)
-    draw.text((x, top+16),    "IP: " + str(IP),  font=font, fill=255)
-    draw.text((x, top+40),    str(CPU), font=font, fill=255)
-    draw.text((x, top+48),    str(MemUsage),  font=font, fill=255)
-    draw.text((x, top+56),    str(Disk),  font=font, fill=255)
+    draw.text((x, top+8),     "Battery:" + str(battery)+"V",  font=font, fill=255)
 
+    if currentPage == 0:
+
+        # Main page
+
+        # Shell scripts for system monitoring from here : https://unix.stackexchange.com/questions/119126/command-to-display-memory-usage-disk-usage-and-cpu-load
+        cmd = "hostname -I | cut -d\' \' -f1"
+        IP = subprocess.check_output(cmd, shell = True ).decode('utf-8')
+        cmd = "top -bn1 | grep load | awk '{printf \"CPU Load: %.2f\", $(NF-2)}'"
+        CPU = subprocess.check_output(cmd, shell = True ).decode('utf-8')      
+        cmd = "free -m | awk 'NR==2{printf \"Mem: %s/%sMB %.2f%%\", $3,$2,$3*100/$2 }'"
+        MemUsage = subprocess.check_output(cmd, shell = True ).decode('utf-8')      
+        cmd = "df -h | awk '$NF==\"/\"{printf \"Disk: %d/%dGB %s\", $3,$2,$5}'"
+        Disk = subprocess.check_output(cmd, shell = True ).decode('utf-8') 
+
+        draw.text((x, top+24),    "IP: " + str(IP),  font=font, fill=255)
+        draw.text((x, top+40),    str(CPU), font=font, fill=255)
+        draw.text((x, top+48),    str(MemUsage),  font=font, fill=255)
+        draw.text((x, top+56),    str(Disk),  font=font, fill=255)
+
+        if framesDisplayed > 1:
+            # Delay before next frame
+            time.sleep(1)
+
+        # Don't switch pages until we know we have an IP
+        if IP == '\n':
+            framesDisplayed = 0
+
+        # See if we go to next page
+        if framesDisplayed > 4:
+            currentPage = 1
+            framesDisplayed = 0
+
+    elif currentPage == 1:
+
+        # IMU page
+
+        # read sensor values
+        accel = gy91.readAccel()
+        gyro = gy91.readGyro()
+        mag = gy91.readMagnet()
+        temp1 = round(gy91.readTemperature(),1)
+        temperature, pressure = gy91.readBMP280All()
+
+        # display them
+
+        draw.text((x, top+16),    "ax: " + str(accel['x']),  font=font, fill=255)
+        draw.text((x, top+24),    "ay: " + str(accel['y']),  font=font, fill=255)
+        draw.text((x, top+32),    "az: " + str(accel['z']),  font=font, fill=255)
+
+        draw.text((x, top+40),    "gx: " + str(gyro['x']),  font=font, fill=255)
+        draw.text((x, top+48),    "gy: " + str(gyro['y']),  font=font, fill=255)
+        draw.text((x, top+56),    "gz: " + str(gyro['z']),  font=font, fill=255)
+
+        draw.text((x+64, top+40),    "mx: " + str(mag['x']),  font=font, fill=255)
+        draw.text((x+64, top+48),    "my: " + str(mag['y']),  font=font, fill=255)
+        draw.text((x+64, top+56),    "mz: " + str(mag['z']),  font=font, fill=255)
+
+        #draw.text((x+64, top+16),    "T1: " + str(temp1),  font=font, fill=255)
+        draw.text((x+64, top+16),    "T:" + str(round(temperature,1)) + "C",  font=font, fill=255)
+        draw.text((x+64, top+24),    "P:" + str(round(pressure,2)) + "hPa",  font=font, fill=255)
+
+        # See if we go to next page
+        if framesDisplayed > 25:
+            currentPage = 0
+            framesDisplayed = 0
+
+        time.sleep(0.1)
+
+    # Now display whats been presented
     image_rotated = image.rotate(180)
     disp.image(image_rotated)
     disp.display()
-    time.sleep(1)
+    framesDisplayed += 1
+
