@@ -1,10 +1,9 @@
 [Unit]
-Description=Start DingoCar control and monitoring
+Description=DingoCar OLED user interface
 After=network.target
 
 [Service]
 ExecStart=/home/pi/play/ai/dingocar/utility/dingo_env.sh dingo_ui.py
-ExecStop=/home/pi/play/ai/dingocar/utility/dingo_env.sh oled_message.py Halting
 WorkingDirectory=/home/pi/play/ai/dingocar/utility
 StandardOutput=inherit
 StandardError=inherit

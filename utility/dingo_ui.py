@@ -30,6 +30,7 @@ from PIL import ImageFont
 
 import subprocess
 import time
+import signal
 
 # IMU library
 import GY91
@@ -50,6 +51,20 @@ def get_battery_voltage():
     vratio = last_4 << 6 | first_6
 
     return round(vratio * MCP3021_RATIO, 2)
+
+# Signal catcher to handle graceful termination of process (e.g. shutdown/poweroff/ctrl-C)
+def exit_gracefully(signum, frame):
+    # Display halting message before exiting
+    image = Image.new('1', (width, height))
+    draw = ImageDraw.Draw(image)
+    draw.text((0, 0), "HALTING", font=font, fill=255)
+    image = image.rotate(180)
+    disp.image(image)
+    disp.display()
+    raise(SystemExit)
+
+signal.signal(signal.SIGINT, exit_gracefully)
+signal.signal(signal.SIGTERM, exit_gracefully)
 
 # Raspberry Pi pin configuration:
 RST = None     # on the PiOLED this pin isnt used
@@ -126,8 +141,12 @@ while True:
             # Delay before next frame
             time.sleep(1)
 
+        # Don't switch pages until we know we have an IP
+        if IP == '\n':
+            framesDisplayed = 0
+
         # See if we go to next page
-        if framesDisplayed > 3:
+        if framesDisplayed > 4:
             currentPage = 1
             framesDisplayed = 0
 
@@ -161,7 +180,7 @@ while True:
         draw.text((x+64, top+24),    "P:" + str(round(pressure,2)) + "hPa",  font=font, fill=255)
 
         # See if we go to next page
-        if framesDisplayed > 30:
+        if framesDisplayed > 25:
             currentPage = 0
             framesDisplayed = 0
 
