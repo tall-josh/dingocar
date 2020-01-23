@@ -5,14 +5,14 @@
 #  FaBo <info@fabo.io>
 #
 # Further modified by Cary Dreelan to include the BMP280 sensor data 
-# that is also on thy GY91 IMU/MPU board
+# that is also on the GY91 IMU/MPU board
 #
 #  Released under APACHE LICENSE, VERSION 2.0
 #
 #  http://www.apache.org/licenses/
 #
 
-# import smbus   # CD - leverage the i2c bus from the Adafruit libs
+# import smbus   # CD - leverage the i2c bus from the Adafruit libs instead
 import time
 from ctypes import c_short
 from ctypes import c_byte
@@ -23,9 +23,9 @@ from ctypes import c_ubyte
 SLAVE_ADDRESS        = 0x68
 ## AK8963 I2C slave address
 AK8963_SLAVE_ADDRESS = 0x0C
-## Device id
+## Device ids
 DEVICE_ID            = 0x71
-BMPDEVICE = 0x76
+BMPDEVICE_ID         = 0x76
 
 ''' MPU-9250 Register Addresses '''
 ## sample rate driver
@@ -118,7 +118,7 @@ def getUChar(data,index):
     return result
 
 ## smbus  - CD now pass the 'bus' object into the class rather than be global
-# bus = smbus.SMBus(1)   # CD - change to use the Adafruit bus
+# bus = smbus.SMBus(1)   # CD - removed to allow using the passed Adafruit i2cbus object
 
 ## GY91 = MPU9250 + BMP280 I2C Controll class
 class GY91:
@@ -290,7 +290,7 @@ class GY91:
 
         return {"x":x, "y":y, "z":z}
 
-    ## Read temperature
+    ## Read temperature from MPU9250 (BMP280 below also has a temp sensor)
     #  @param [out] temperature temperature(degrees C)
     def readTemperature(self):
         data = self.bus.read_i2c_block_data(self.address, TEMP_OUT, 2)
@@ -310,33 +310,37 @@ class GY91:
             value -= (1<<16)
         return value
 
-    # BMP280 stuff
 
+    # BMP280 stuff
+    # CD - added when converting class from MPU9250 to GY91 class
+    #      GY91 is a board that has both an MPU9250 & a BMP280 on same i2c bus
+    #    - Note code was taken from a BME280 example (note E not P) that has humidity
+    #      and the P version does not have this ability, so humidity code commented out
     
-    def readBME280ID(self, addr=BMPDEVICE):
+    def readBMP280ID(self, addr=BMPDEVICE_ID):
         # Chip ID Register Address
         REG_ID         = 0xD0
         (chip_id, chip_version) = self.bus.read_i2c_block_data(addr, REG_ID, 2)
         return (chip_id, chip_version)
     
-    def readBME280All(self, addr=BMPDEVICE):
+    def readBMP280All(self, addr=BMPDEVICE_ID):
         # Register Addresses
-        REG_DATA = 0xF7
+        REG_DATA    = 0xF7
         REG_CONTROL = 0xF4
-        REG_CONFIG    = 0xF5
+        REG_CONFIG  = 0xF5
     
-        REG_CONTROL_HUM = 0xF2
-        REG_HUM_MSB = 0xFD
-        REG_HUM_LSB = 0xFE
+        # REG_CONTROL_HUM = 0xF2
+        # REG_HUM_MSB = 0xFD
+        # REG_HUM_LSB = 0xFE
     
         # Oversample setting - page 27
         OVERSAMPLE_TEMP = 2
         OVERSAMPLE_PRES = 2
         MODE = 1
     
-        # Oversample setting for humidity register - page 26
-        OVERSAMPLE_HUM = 2
-        self.bus.write_byte_data(addr, REG_CONTROL_HUM, OVERSAMPLE_HUM)
+        # # Oversample setting for humidity register - page 26
+        # OVERSAMPLE_HUM = 2
+        # self.bus.write_byte_data(addr, REG_CONTROL_HUM, OVERSAMPLE_HUM)
     
         control = OVERSAMPLE_TEMP<<5 | OVERSAMPLE_PRES<<2 | MODE
         self.bus.write_byte_data(addr, REG_CONTROL, control)
@@ -362,29 +366,29 @@ class GY91:
         dig_P8 = getShort(cal1, 20)
         dig_P9 = getShort(cal1, 22)
     
-        dig_H1 = getUChar(cal2, 0)
-        dig_H2 = getShort(cal3, 0)
-        dig_H3 = getUChar(cal3, 2)
+        # dig_H1 = getUChar(cal2, 0)
+        # dig_H2 = getShort(cal3, 0)
+        # dig_H3 = getUChar(cal3, 2)
     
-        dig_H4 = getChar(cal3, 3)
-        dig_H4 = (dig_H4 << 24) >> 20
-        dig_H4 = dig_H4 | (getChar(cal3, 4) & 0x0F)
+        # dig_H4 = getChar(cal3, 3)
+        # dig_H4 = (dig_H4 << 24) >> 20
+        # dig_H4 = dig_H4 | (getChar(cal3, 4) & 0x0F)
     
-        dig_H5 = getChar(cal3, 5)
-        dig_H5 = (dig_H5 << 24) >> 20
-        dig_H5 = dig_H5 | (getUChar(cal3, 4) >> 4 & 0x0F)
+        # dig_H5 = getChar(cal3, 5)
+        # dig_H5 = (dig_H5 << 24) >> 20
+        # dig_H5 = dig_H5 | (getUChar(cal3, 4) >> 4 & 0x0F)
     
-        dig_H6 = getChar(cal3, 6)
+        # dig_H6 = getChar(cal3, 6)
     
         # Wait in ms (Datasheet Appendix B: Measurement time and current calculation)
-        wait_time = 1.25 + (2.3 * OVERSAMPLE_TEMP) + ((2.3 * OVERSAMPLE_PRES) + 0.575) + ((2.3 * OVERSAMPLE_HUM)+0.575)
+        wait_time = 1.25 + (2.3 * OVERSAMPLE_TEMP) + ((2.3 * OVERSAMPLE_PRES) + 0.575) # + ((2.3 * OVERSAMPLE_HUM)+0.575)
         time.sleep(wait_time/1000)    # Wait the required time    
     
         # Read temperature/pressure/humidity
         data = self.bus.read_i2c_block_data(addr, REG_DATA, 8)
         pres_raw = (data[0] << 12) | (data[1] << 4) | (data[2] >> 4)
         temp_raw = (data[3] << 12) | (data[4] << 4) | (data[5] >> 4)
-        hum_raw = (data[6] << 8) | data[7]
+        # hum_raw = (data[6] << 8) | data[7]
     
         #Refine temperature
         var1 = ((((temp_raw>>3)-(dig_T1<<1)))*(dig_T2)) >> 11
@@ -408,14 +412,14 @@ class GY91:
             var2 = pressure * dig_P8 / 32768.0
             pressure = pressure + (var1 + var2 + dig_P7) / 16.0
     
-        # Refine humidity
-        humidity = t_fine - 76800.0
-        humidity = (hum_raw - (dig_H4 * 64.0 + dig_H5 / 16384.0 * humidity)) * (dig_H2 / 65536.0 * (1.0 + dig_H6 / 67108864.0 * humidity * (1.0 + dig_H3 / 67108864.0 * humidity)))
-        humidity = humidity * (1.0 - dig_H1 * humidity / 524288.0)
-        if humidity > 100:
-            humidity = 100
-        elif humidity < 0:
-            humidity = 0
+        # # Refine humidity
+        # humidity = t_fine - 76800.0
+        # humidity = (hum_raw - (dig_H4 * 64.0 + dig_H5 / 16384.0 * humidity)) * (dig_H2 / 65536.0 * (1.0 + dig_H6 / 67108864.0 * humidity * (1.0 + dig_H3 / 67108864.0 * humidity)))
+        # humidity = humidity * (1.0 - dig_H1 * humidity / 524288.0)
+        # if humidity > 100:
+        #     humidity = 100
+        # elif humidity < 0:
+        #     humidity = 0
     
-        return temperature/100.0,pressure/100.0,humidity
+        return temperature/100.0,pressure/100.0 # ,humidity
     
